@@ -38,7 +38,18 @@ app.use(cors({
   },
   credentials: true
 }));
+// ── Preflight support (IMPORTANT) ─────────────────────────────────────────────
+app.options('*', cors({
+  origin: (origin, cb) => {
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
 
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    cb(null, false);
+  },
+  credentials: true
+}));
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '2mb' }));
 

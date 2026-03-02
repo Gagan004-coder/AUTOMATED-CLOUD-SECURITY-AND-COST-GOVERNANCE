@@ -834,14 +834,17 @@ body, .sidebar, .main, .panel, .metric-card,
             <div style="font-family:var(--font-mono);font-size:.72rem;line-height:2;color:var(--muted-hi)">
               Add these to your <span style="color:var(--lime)">.env</span> file:<br><br>
               <div style="background:var(--ink-3);padding:.875rem 1rem;border-radius:8px;border:1px solid var(--border);color:var(--white);font-size:.7rem;line-height:1.8">
-                <span style="color:var(--muted)">## Gmail (recommended)</span><br>
-                <span style="color:var(--amber)">SMTP_HOST</span>=smtp.gmail.com<br>
-                <span style="color:var(--amber)">SMTP_PORT</span>=587<br>
-                <span style="color:var(--amber)">SMTP_USER</span>=you@gmail.com<br>
-                <span style="color:var(--amber)">SMTP_PASS</span>=your-app-password<br>
-                <span style="color:var(--amber)">ALERT_EMAIL</span>=admin@yourcompany.com<br>
-                <span style="color:var(--amber)">COST_ALERT_THRESHOLD</span>=500<br>
-                <span style="color:var(--amber)">MAX_ABSENT_DAYS</span>=5<br>
+                <span style="color:var(--lime)">## Option A: SendGrid (recommended for Render)</span><br>
+<span style="color:var(--amber)">SENDGRID_API_KEY</span>=SG.xxxxxxxxxxxxxxxx<br>
+<span style="color:var(--amber)">SENDGRID_FROM</span>=you@gmail.com<br><br>
+<span style="color:var(--lime)">## Option B: Gmail SMTP (local / paid Render only)</span><br>
+<span style="color:var(--amber)">SMTP_HOST</span>=smtp.gmail.com<br>
+<span style="color:var(--amber)">SMTP_PORT</span>=587<br>
+<span style="color:var(--amber)">SMTP_USER</span>=you@gmail.com<br>
+<span style="color:var(--amber)">SMTP_PASS</span>=your-app-password<br>
+<span style="color:var(--amber)">ALERT_EMAIL</span>=admin@yourcompany.com<br>
+<span style="color:var(--amber)">COST_ALERT_THRESHOLD</span>=500<br>
+<span style="color:var(--amber)">MAX_ABSENT_DAYS</span>=5<br>
               </div>
               <br>
               <span style="color:var(--sky)">💡 Gmail users:</span> Use an App Password from <span style="color:var(--lime)">myaccount.google.com/apppasswords</span>
@@ -1368,16 +1371,19 @@ function renderAbsenceUsers() {
     </div>`;
   }).join('');
 }
-
+let _planLock = false;
 async function createAbsencePlan() {
-  const userId    = document.getElementById('plan-user').value.trim();
-  const totalDays = parseInt(document.getElementById('plan-days').value);
-  const startDate = document.getElementById('plan-start').value;
-  const email     = document.getElementById('plan-email').value.trim();
-  const keepRaw   = document.getElementById('plan-keep').value.trim();
+  if (_planLock) { toast('Plan already being created, please wait...', 'warn'); return; }
+  _planLock = true;
+
+  const userId     = document.getElementById('plan-user').value.trim();
+  const totalDays  = parseInt(document.getElementById('plan-days').value);
+  const startDate  = document.getElementById('plan-start').value;
+  const email      = document.getElementById('plan-email').value.trim();
+  const keepRaw    = document.getElementById('plan-keep').value.trim();
   const keepRunning = keepRaw ? keepRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-  if (!userId || !totalDays) { toast('User ID and duration are required', 'error'); return; }
+  if (!userId || !totalDays) { toast('User ID and duration are required', 'error'); _planLock = false; return; }
 
   try {
     const result = await api('POST', '/notify/absence/plan', { userId, totalDays, startDate, keepRunning, notifyEmail: email });
@@ -1388,9 +1394,10 @@ async function createAbsencePlan() {
     refreshAbsenceStatus();
   } catch (err) {
     toast('Plan creation failed: ' + err.message, 'error');
+  } finally {
+    setTimeout(() => { _planLock = false; }, 5000); // unlock after 5s
   }
 }
-
 function renderAbsencePlan(plan) {
   setText('plan-days-badge', `${plan.totalDays} days — ${plan.userId}`);
   const timeline = document.getElementById('plan-timeline');
@@ -1441,20 +1448,19 @@ async function checkEmailConfig() {
     if (config.configured) {
       card.classList.add('configured');
       setText('smtp-icon', '✅');
-      setText('smtp-label', 'SMTP Connected');
-      setText('smtp-detail', config.smtp.user || 'Connected');
+      setText('smtp-label', config.provider === 'sendgrid' ? 'SendGrid Connected' : 'SMTP Connected');
+      setText('smtp-detail', config.provider === 'sendgrid' ? 'Sending via SendGrid API' : (config.smtp?.user || 'Connected'));
       setText('badge-notify', 'ON');
     } else {
       card.classList.add('not-configured');
       setText('smtp-icon', '⚠️');
-      setText('smtp-label', 'SMTP Not Configured');
-      setText('smtp-detail', 'Add SMTP_USER and SMTP_PASS to .env');
+      setText('smtp-label', 'Email Not Configured');
+      setText('smtp-detail', 'Add SENDGRID_API_KEY or SMTP_USER + SMTP_PASS');
       setText('badge-notify', 'OFF');
     }
     if (config.alertEmail) setText('alert-email-display', config.alertEmail);
   } catch {}
 }
-
 async function sendTestEmail() {
   const to = document.getElementById('test-email-to').value.trim();
   const btn = document.getElementById('test-email-btn');

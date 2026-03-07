@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudGuard Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Saira:wght@300;400;500;600&family=Saira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --ink:#0d0d0d;--ink-2:#141414;--ink-3:#1e1e1e;--ink-4:#282828;
+  --border:rgba(255,255,255,0.07);--border-hi:rgba(255,255,255,0.15);
+  --lime:#c6f135;--lime-dim:rgba(198,241,53,0.1);--lime-mid:rgba(198,241,53,0.2);
+  --red:#ff4747;--red-dim:rgba(255,71,71,0.1);
+  --amber:#ffb547;--amber-dim:rgba(255,181,71,0.1);
+  --sky:#47c8ff;--sky-dim:rgba(71,200,255,0.1);
+  --purple:#a78bfa;--purple-dim:rgba(167,139,250,0.1);
+  --white:#f0f0eb;--muted:#555;--muted-hi:#aaa;
+  --font-head:'Chakra Petch',sans-serif;
+  --font-body:'Saira',sans-serif;
+  --font-mono:'Saira Mono',monospace;
+}
+
+body{font-family:var(--font-body);background:var(--ink);color:var(--white);min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.35}
+
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* ════ LOGIN ════ */
+.login-screen{position:fixed;inset:0;background:var(--ink);z-index:500;display:flex;align-items:center;justify-content:center}
+.login-card{background:var(--ink-2);border:1px solid var(--border-hi);border-radius:20px;padding:3rem;width:100%;max-width:460px;position:relative;overflow:hidden}
+.login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--lime),transparent)}
+.login-logo{display:flex;align-items:center;gap:.75rem;margin-bottom:2.5rem}
+.login-mark{width:40px;height:40px;background:var(--lime);border-radius:10px;display:grid;place-items:center;font-size:1.2rem;font-family:var(--font-head);color:var(--ink);font-weight:700}
+.login-title{font-family:var(--font-head);font-weight:700;font-size:1.3rem;letter-spacing:-.01em}
+.login-sub{font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:.15rem}
+.step{display:none}.step.active{display:block}
+.field-label{font-family:var(--font-mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-hi);margin-bottom:.5rem;display:block}
+.field-input{width:100%;padding:.75rem 1rem;background:var(--ink-3);border:1px solid var(--border-hi);border-radius:8px;color:var(--white);font-family:var(--font-mono);font-size:.85rem;outline:none;transition:border-color .15s}
+.field-input:focus{border-color:var(--lime)}
+.field-group{margin-bottom:1.25rem}
+.btn-login{width:100%;padding:.875rem;background:var(--lime);color:var(--ink);font-family:var(--font-head);font-weight:700;font-size:.9rem;border:none;border-radius:8px;cursor:pointer;transition:all .15s;letter-spacing:.04em;margin-top:.5rem}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(198,241,53,.3)}
+.btn-login:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.login-hint{margin-top:1.25rem;padding:1rem;background:var(--sky-dim);border:1px solid rgba(71,200,255,.15);border-radius:8px;font-size:.78rem;line-height:1.6;color:rgba(71,200,255,.9);font-family:var(--font-mono)}
+.sso-pending{text-align:center;padding:.5rem 0}
+.sso-url-box{padding:1rem;background:var(--ink-3);border:1px solid var(--border-hi);border-radius:8px;font-family:var(--font-mono);font-size:.78rem;color:var(--lime);word-break:break-all;margin:.75rem 0;cursor:pointer;transition:background .15s}
+.sso-url-box:hover{background:var(--ink-4)}
+.sso-code{font-family:var(--font-head);font-size:2rem;letter-spacing:.3em;color:var(--lime);margin:.5rem 0}
+.polling-dots span{animation:blink 1.2s infinite both}
+.polling-dots span:nth-child(2){animation-delay:.2s}
+.polling-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+.account-list{display:flex;flex-direction:column;gap:.5rem;max-height:300px;overflow-y:auto;margin:.75rem 0}
+.account-item{padding:.875rem 1rem;background:var(--ink-3);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s}
+.account-item:hover{border-color:var(--lime);background:var(--lime-dim)}
+.account-id{font-family:var(--font-mono);font-size:.7rem;color:var(--muted-hi);margin-top:.2rem}
+.role-list{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.role-chip{padding:.2rem .6rem;background:var(--ink-4);border:1px solid var(--border-hi);border-radius:4px;font-size:.68rem;font-family:var(--font-mono);color:var(--muted-hi);cursor:pointer;transition:all .15s}
+.role-chip:hover{border-color:var(--lime);color:var(--lime)}
+
+/* ════ SIDEBAR ════ */
+.sidebar{background:var(--ink-2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+.sidebar-logo{padding:1.5rem 1.5rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.7rem}
+.logo-mark{width:32px;height:32px;background:var(--lime);border-radius:7px;display:grid;place-items:center;font-family:var(--font-head);font-weight:700;color:var(--ink);font-size:.85rem;flex-shrink:0}
+.logo-text{font-family:var(--font-head);font-weight:700;font-size:.95rem;letter-spacing:-.01em}
+.logo-ver{font-size:.6rem;color:var(--muted);font-family:var(--font-mono);margin-top:.1rem}
+.sidebar-account{padding:.6rem 1.5rem;background:var(--lime-dim);border-bottom:1px solid rgba(198,241,53,.12);font-family:var(--font-mono);font-size:.68rem}
+.acct-id{color:var(--lime);font-weight:500}
+.acct-role{color:var(--muted-hi);margin-top:.1rem}
+.sidebar-status{padding:.55rem 1.5rem;display:flex;align-items:center;gap:.5rem;font-family:var(--font-mono);font-size:.65rem;border-bottom:1px solid var(--border)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+.sidebar-nav{padding:1rem .75rem;flex:1;display:flex;flex-direction:column;gap:.2rem;overflow-y:auto}
+.nav-section{font-family:var(--font-mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:.5rem .625rem .2rem}
+.nav-item{display:flex;align-items:center;gap:.65rem;padding:.55rem .625rem;border-radius:7px;cursor:pointer;font-size:.82rem;font-weight:500;color:rgba(240,240,235,.5);transition:all .12s;border:1px solid transparent;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.04);color:var(--white)}
+.nav-item.active{background:var(--lime-dim);color:var(--lime);border-color:rgba(198,241,53,.18)}
+.nav-icon{font-size:.9rem;width:18px;text-align:center}
+.nav-badge{margin-left:auto;font-family:var(--font-mono);font-size:.6rem;padding:.1rem .35rem;border-radius:3px;font-weight:500}
+.badge-red{background:rgba(255,71,71,.2);color:var(--red);border:1px solid rgba(255,71,71,.25)}
+.badge-amber{background:rgba(255,181,71,.15);color:var(--amber);border:1px solid rgba(255,181,71,.2)}
+.badge-ok{background:var(--lime-dim);color:var(--lime);border:1px solid rgba(198,241,53,.2)}
+.badge-purple{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
+.sidebar-footer{padding:.875rem 1.5rem;border-top:1px solid var(--border)}
+.scan-btn{width:100%;padding:.65rem;background:var(--lime);color:var(--ink);font-family:var(--font-head);font-weight:700;font-size:.8rem;border:none;border-radius:7px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.45rem}
+.scan-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(198,241,53,.3)}
+.scan-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.last-scan{font-family:var(--font-mono);font-size:.6rem;color:var(--muted);text-align:center;margin-bottom:.5rem}
+
+/* ════ MAIN ════ */
+.main{display:flex;flex-direction:column;overflow-y:auto;min-height:100vh}
+.topbar{padding:1.25rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(13,13,13,.88);backdrop-filter:blur(20px);z-index:50}
+.page-title{font-family:var(--font-head);font-weight:700;font-size:1.3rem;letter-spacing:-.02em}
+.page-sub{font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:.15rem}
+.topbar-right{display:flex;align-items:center;gap:.75rem}
+.clock{font-family:var(--font-mono);font-size:.72rem;color:var(--muted);background:var(--ink-3);padding:.35rem .65rem;border-radius:5px;border:1px solid var(--border)}
+.icon-btn{width:32px;height:32px;background:var(--ink-3);border:1px solid var(--border);border-radius:6px;cursor:pointer;display:grid;place-items:center;font-size:.9rem;color:var(--white);transition:all .12s}
+.icon-btn:hover{border-color:var(--border-hi)}
+.logout-btn{padding:.35rem .75rem;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted-hi);font-family:var(--font-mono);font-size:.68rem;cursor:pointer;transition:all .12s}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+.content{padding:1.75rem 2rem;flex:1}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* ── Metrics ── */
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+.metric-card{background:var(--ink-2);border:1px solid var(--border);border-radius:12px;padding:1.375rem;position:relative;overflow:hidden;transition:border-color .2s}
+.metric-card:hover{border-color:var(--border-hi)}
+.metric-stripe{position:absolute;bottom:0;left:0;right:0;height:2px}
+.metric-lbl{font-family:var(--font-mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.6rem}
+.metric-val{font-family:var(--font-head);font-weight:700;font-size:2rem;letter-spacing:-.04em;line-height:1;margin-bottom:.35rem}
+.metric-sub{font-size:.72rem;color:var(--muted)}
+.metric-icon{position:absolute;top:1.1rem;right:1.1rem;font-size:1.3rem;opacity:.3}
+.progress-bar{height:3px;background:var(--ink-3);border-radius:2px;overflow:hidden;margin-top:.5rem}
+.progress-fill{height:100%;border-radius:2px;transition:width 1.2s ease}
+
+/* ── Panels ── */
+.panel{background:var(--ink-2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.panel-header{padding:1rem 1.375rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-family:var(--font-head);font-weight:700;font-size:.88rem;letter-spacing:-.01em}
+.panel-badge{font-family:var(--font-mono);font-size:.65rem;padding:.18rem .5rem;border-radius:4px;background:var(--ink-3);border:1px solid var(--border);color:var(--muted-hi)}
+.panel-body{padding:1.375rem}
+.two-col{display:grid;grid-template-columns:1fr 320px;gap:1.25rem;margin-bottom:1.5rem}
+.col-stack{display:flex;flex-direction:column;gap:1.25rem}
+
+/* ── Bar chart ── */
+.bar-chart{display:flex;align-items:flex-end;gap:.5rem;height:110px}
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:.35rem;height:100%}
+.bar{width:100%;background:var(--lime-dim);border:1px solid rgba(198,241,53,.18);border-radius:4px 4px 0 0;transition:background .15s;cursor:pointer;flex-shrink:0;position:relative}
+.bar:hover{background:var(--lime-mid)}
+.bar::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--ink-4);border:1px solid var(--border-hi);padding:.3rem .5rem;border-radius:5px;font-family:var(--font-mono);font-size:.65rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s}
+.bar:hover::after{opacity:1}
+.bar-lbl{font-family:var(--font-mono);font-size:.58rem;color:var(--muted)}
+
+/* ── Score ring ── */
+.score-wrap{display:flex;flex-direction:column;align-items:center;padding:1.5rem 1rem}
+.ring{position:relative;width:120px;height:120px;margin-bottom:1rem}
+.ring svg{transform:rotate(-90deg)}
+.ring-track{fill:none;stroke:var(--ink-3);stroke-width:7}
+.ring-fill{fill:none;stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset 1.5s ease}
+.ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-num{font-family:var(--font-head);font-weight:700;font-size:2.1rem;letter-spacing:-.05em}
+.ring-sub{font-family:var(--font-mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.score-desc{font-size:.75rem;color:var(--muted);text-align:center;line-height:1.5}
+
+/* ── Issue list ── */
+.issue-list{display:flex;flex-direction:column}
+.issue-row{display:flex;align-items:center;gap:.875rem;padding:.875rem 1.375rem;border-bottom:1px solid var(--border);transition:background .1s}
+.issue-row:last-child{border-bottom:none}
+.issue-row:hover{background:rgba(255,255,255,.025)}
+.pip{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pip-critical{background:var(--red);box-shadow:0 0 7px var(--red)}
+.pip-high{background:var(--amber);box-shadow:0 0 7px var(--amber)}
+.pip-medium{background:var(--sky)}
+.pip-low{background:var(--muted)}
+.pip-ok{background:var(--lime)}
+.issue-info{flex:1;min-width:0}
+.issue-name{font-weight:500;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.issue-desc{font-family:var(--font-mono);font-size:.66rem;color:var(--muted);margin-top:.15rem}
+.sev-tag{font-family:var(--font-mono);font-size:.6rem;padding:.15rem .45rem;border-radius:4px;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}
+.tag-critical{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,71,71,.2)}
+.tag-high{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,181,71,.2)}
+.tag-medium{background:var(--sky-dim);color:var(--sky);border:1px solid rgba(71,200,255,.2)}
+.tag-low{background:var(--ink-3);color:var(--muted);border:1px solid var(--border)}
+.tag-ok{background:var(--lime-dim);color:var(--lime);border:1px solid rgba(198,241,53,.2)}
+.fix-btn{padding:.28rem .65rem;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted-hi);font-size:.65rem;cursor:pointer;transition:all .12s;font-family:var(--font-mono);flex-shrink:0}
+.fix-btn:hover{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+.fix-btn.fixing{border-color:var(--amber);color:var(--amber);animation:spin .8s linear infinite}
+.fix-btn.fixed{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+
+/* ── Action grid ── */
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.action-item{padding:.875rem;background:var(--ink-3);border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:all .12s;text-align:left}
+.action-item:hover{border-color:var(--lime);background:var(--lime-dim)}
+.action-icon{font-size:1.1rem;margin-bottom:.3rem}
+.action-lbl{font-size:.75rem;font-weight:500;color:var(--white)}
+
+/* ── Service breakdown ── */
+.service-row{display:flex;align-items:center;gap:.75rem;padding:.65rem 0;border-bottom:1px solid var(--border)}
+.service-row:last-child{border-bottom:none}
+.service-name{font-size:.78rem;font-weight:500;flex:1}
+.service-bar-wrap{width:90px;height:4px;background:var(--ink-3);border-radius:2px;overflow:hidden}
+.service-bar-fill{height:100%;border-radius:2px;background:var(--lime);transition:width 1s ease}
+.service-cost{font-family:var(--font-mono);font-size:.7rem;color:var(--muted-hi);width:60px;text-align:right}
+
+/* ── Empty ── */
+.empty{padding:2.5rem;text-align:center;color:var(--muted)}
+.empty-icon{font-size:2rem;margin-bottom:.5rem;opacity:.4}
+.empty-text{font-size:.8rem}
+
+/* ── Scan overlay ── */
+.scan-overlay{position:fixed;inset:0;background:rgba(13,13,13,.75);backdrop-filter:blur(8px);z-index:400;display:none;align-items:center;justify-content:center}
+.scan-modal{background:var(--ink-2);border:1px solid rgba(198,241,53,.25);border-radius:16px;padding:2.25rem 2.5rem;text-align:center;position:relative;overflow:hidden;min-width:300px}
+.scan-line{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--lime),transparent);animation:scanLine 1.8s ease-in-out infinite;top:0}
+@keyframes scanLine{0%{transform:translateY(-1px);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(400px);opacity:0}}
+.scan-steps{display:flex;flex-direction:column;gap:.35rem;text-align:left;margin-top:1.25rem}
+.scan-step{display:flex;align-items:center;gap:.6rem;font-family:var(--font-mono);font-size:.72rem;color:var(--muted);padding:.35rem 0}
+.scan-step.done{color:var(--lime)}
+.scan-step.active{color:var(--white)}
+.step-icon{width:14px;text-align:center}
+
+/* ── Toast ── */
+.toast-wrap{position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;display:flex;flex-direction:column;gap:.4rem;pointer-events:none}
+.toast{pointer-events:all;padding:.7rem 1rem;border-radius:7px;font-family:var(--font-mono);font-size:.72rem;border:1px solid;backdrop-filter:blur(20px);animation:toastIn .25s ease;max-width:300px;display:flex;align-items:center;gap:.5rem}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.toast.success{background:rgba(198,241,53,.09);border-color:rgba(198,241,53,.25);color:var(--lime)}
+.toast.error{background:var(--red-dim);border-color:rgba(255,71,71,.25);color:var(--red)}
+.toast.info{background:var(--sky-dim);border-color:rgba(71,200,255,.25);color:var(--sky)}
+.toast.warn{background:var(--amber-dim);border-color:rgba(255,181,71,.25);color:var(--amber)}
+
+/* ── Spinner ── */
+.spinner{width:18px;height:18px;border:2px solid rgba(198,241,53,.2);border-top-color:var(--lime);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ════ NEW: EMAIL / NOTIFICATIONS PANEL ════ */
+.email-config-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+.email-status-card{background:var(--ink-3);border:1px solid var(--border);border-radius:10px;padding:1.25rem;position:relative}
+.email-status-card.configured{border-color:rgba(198,241,53,.2);background:var(--lime-dim)}
+.email-status-card.not-configured{border-color:rgba(255,71,71,.2)}
+.email-status-icon{font-size:1.75rem;margin-bottom:.5rem}
+.email-status-label{font-family:var(--font-head);font-size:.82rem;font-weight:700}
+.email-status-detail{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-top:.3rem}
+
+.notif-row{display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.375rem;border-bottom:1px solid var(--border)}
+.notif-row:last-child{border-bottom:none}
+.notif-info{flex:1}
+.notif-name{font-size:.82rem;font-weight:500}
+.notif-desc{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-top:.15rem}
+.notif-actions{display:flex;gap:.5rem}
+.btn-send{padding:.3rem .8rem;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted-hi);font-size:.65rem;cursor:pointer;transition:all .12s;font-family:var(--font-mono)}
+.btn-send:hover{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+.btn-send.active{background:var(--lime);color:var(--ink);border-color:var(--lime);font-weight:700}
+
+.toggle-switch{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--ink-4);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:background .2s}
+.toggle-track::after{content:'';position:absolute;width:14px;height:14px;background:#555;border-radius:50%;top:2px;left:2px;transition:all .2s}
+.toggle-switch input:checked + .toggle-track{background:rgba(198,241,53,.2);border-color:var(--lime)}
+.toggle-switch input:checked + .toggle-track::after{background:var(--lime);transform:translateX(16px)}
+
+.test-email-form{display:flex;gap:.5rem;margin:1rem 1.375rem}
+.test-email-input{flex:1;padding:.6rem .875rem;background:var(--ink-3);border:1px solid var(--border-hi);border-radius:7px;color:var(--white);font-family:var(--font-mono);font-size:.8rem;outline:none;transition:border-color .15s}
+.test-email-input:focus{border-color:var(--lime)}
+.test-email-btn{padding:.6rem 1.25rem;background:var(--lime);color:var(--ink);font-family:var(--font-head);font-weight:700;font-size:.78rem;border:none;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.test-email-btn:hover{box-shadow:0 4px 16px rgba(198,241,53,.3)}
+.test-email-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ════ NEW: AUTO-FIX PANEL ════ */
+.fix-queue-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.375rem;border-bottom:1px solid var(--border)}
+.fix-count-badge{font-family:var(--font-mono);font-size:.68rem;padding:.2rem .6rem;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,181,71,.2);border-radius:4px}
+.run-fixes-btn{padding:.45rem 1rem;background:var(--lime);color:var(--ink);font-family:var(--font-head);font-weight:700;font-size:.75rem;border:none;border-radius:6px;cursor:pointer;transition:all .15s}
+.run-fixes-btn:hover{box-shadow:0 4px 14px rgba(198,241,53,.3)}
+.run-fixes-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.fix-item{display:flex;align-items:flex-start;gap:.875rem;padding:.875rem 1.375rem;border-bottom:1px solid var(--border);transition:background .1s}
+.fix-item:last-child{border-bottom:none}
+.fix-item.selected{background:rgba(198,241,53,.04)}
+.fix-item:hover{background:rgba(255,255,255,.02)}
+.fix-checkbox{width:16px;height:16px;border:1px solid var(--border-hi);border-radius:3px;background:var(--ink-3);cursor:pointer;flex-shrink:0;margin-top:2px;accent-color:var(--lime)}
+.fix-item-info{flex:1;min-width:0}
+.fix-item-name{font-size:.82rem;font-weight:500}
+.fix-item-detail{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-top:.2rem}
+.fix-item-risk{font-family:var(--font-mono);font-size:.58rem;padding:.12rem .4rem;border-radius:3px;flex-shrink:0}
+.fix-result-success{color:var(--lime);font-family:var(--font-mono);font-size:.65rem;background:var(--lime-dim);padding:.15rem .5rem;border-radius:4px;border:1px solid rgba(198,241,53,.2)}
+.fix-result-failed{color:var(--red);font-family:var(--font-mono);font-size:.65rem;background:var(--red-dim);padding:.15rem .5rem;border-radius:4px;border:1px solid rgba(255,71,71,.2)}
+
+/* ════ NEW: ABSENCE MANAGEMENT ════ */
+.absence-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+.user-card{background:var(--ink-3);border:1px solid var(--border);border-radius:10px;padding:1.1rem;position:relative;overflow:hidden}
+.user-card.absent{border-color:rgba(255,71,71,.25)}
+.user-card.at-risk{border-color:rgba(255,181,71,.25)}
+.user-card.active{border-color:rgba(198,241,53,.2)}
+.user-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem}
+.user-name{font-weight:600;font-size:.85rem}
+.user-id{font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-top:.1rem}
+.days-badge{font-family:var(--font-head);font-size:1.25rem;font-weight:700;line-height:1}
+.days-label{font-family:var(--font-mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:.1rem;text-align:right}
+.user-progress{height:3px;background:var(--ink-4);border-radius:2px;overflow:hidden;margin:.6rem 0}
+.user-progress-fill{height:100%;border-radius:2px;transition:width 1s ease}
+.user-actions-row{display:flex;gap:.4rem;margin-top:.6rem}
+.user-action-btn{flex:1;padding:.35rem;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted-hi);font-size:.62rem;cursor:pointer;transition:all .12s;font-family:var(--font-mono);text-align:center}
+.user-action-btn:hover{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+.user-action-btn.danger:hover{border-color:var(--red);color:var(--red);background:var(--red-dim)}
+
+/* Day plan timeline */
+.day-timeline{display:flex;flex-direction:column;gap:0}
+.day-row{display:flex;align-items:stretch;gap:.75rem}
+.day-line-col{display:flex;flex-direction:column;align-items:center;width:20px;flex-shrink:0}
+.day-dot{width:10px;height:10px;border-radius:50%;border:2px solid;flex-shrink:0;margin-top:8px}
+.day-dot-ok{border-color:var(--lime);background:transparent}
+.day-dot-warn{border-color:var(--amber);background:transparent}
+.day-dot-danger{border-color:var(--red);background:var(--red)}
+.day-connector{flex:1;width:1px;background:var(--border);margin:.2rem auto}
+.day-content{flex:1;padding:.6rem 0 1rem}
+.day-num{font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-bottom:.15rem}
+.day-date{font-size:.78rem;font-weight:500}
+.day-actions-list{margin-top:.3rem;display:flex;flex-wrap:wrap;gap:.3rem}
+.day-action-chip{font-family:var(--font-mono);font-size:.6rem;padding:.15rem .5rem;border-radius:4px;background:var(--ink-3);border:1px solid var(--border);color:var(--muted-hi)}
+/* ── Light Theme Overrides ── */
+body.light {
+  --ink: #f4f4f0;
+  --ink-2: #ffffff;
+  --ink-3: #ebebeb;
+  --ink-4: #e0e0e0;
+  --border: rgba(0,0,0,0.08);
+  --border-hi: rgba(0,0,0,0.15);
+  --white: #111111;
+  --muted: #888;
+  --muted-hi: #555;
+  --lime: #5a9e00;
+  --lime-dim: rgba(90,158,0,0.08);
+  --lime-mid: rgba(90,158,0,0.15);
+  --red: #d93025;
+  --red-dim: rgba(217,48,37,0.08);
+  --amber: #b06000;
+  --amber-dim: rgba(176,96,0,0.08);
+  --sky: #0077aa;
+  --sky-dim: rgba(0,119,170,0.08);
+  --purple: #6d28d9;
+  --purple-dim: rgba(109,40,217,0.08);
+}
+body.light { --nav-text: rgba(17,17,17,0.55); --muted:#777; --muted-hi:#444; }
+
+body.light .topbar { background: rgba(244,244,240,0.92); }
+
+body.light .sidebar { background: #f9f9f6; }
+
+body.light .nav-item { color: var(--muted-hi); }
+
+body.light .nav-item:hover { background: rgba(0,0,0,0.05); color: var(--white); }
+
+body.light .sso-url-box { color: var(--lime); }
+
+body.light .day-action-chip { color: #333; background: #e0e0e0; border-color: #ccc; }
+
+body.light .bar::after { background: #222; color: #f0f0eb; border-color: #444; }
+
+body.light .scan-modal { background: #fff; color: #111; }
+
+body.light .scan-step { color: #666; }
+body.light .scan-step.active { color: #111; }
+body.light .scan-step.done { color: var(--lime); }
+/* Absence plan form */
+.plan-form{background:var(--ink-3);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.25rem}
+.plan-form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+.form-field{display:flex;flex-direction:column;gap:.3rem}
+.form-label{font-family:var(--font-mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-hi)}
+.form-input{padding:.55rem .75rem;background:var(--ink-4);border:1px solid var(--border);border-radius:6px;color:var(--white);font-family:var(--font-mono);font-size:.8rem;outline:none;transition:border-color .15s}
+.form-input:focus{border-color:var(--lime)}
+.create-plan-btn{width:100%;padding:.65rem;background:var(--lime);color:var(--ink);font-family:var(--font-head);font-weight:700;font-size:.8rem;border:none;border-radius:7px;cursor:pointer;transition:all .15s}
+.create-plan-btn:hover{box-shadow:0 4px 16px rgba(198,241,53,.3)}
+
+@media(max-width:1100px){.metrics-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}.email-config-grid,.absence-grid,.plan-form-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<!-- ════════ LOGIN SCREEN ════════ -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-mark">CG</div>
+      <div>
+        <div class="login-title">CloudGuard Pro</div>
+        <div class="login-sub">AWS SSO AUTHENTICATION</div>
+      </div>
+    </div>
+    <div class="step active" id="step-url">
+      <div class="field-group">
+        <label class="field-label">AWS SSO Start URL</label>
+        <input class="field-input" id="sso-url-input" type="url" placeholder="https://your-company.awsapps.com/start">
+      </div>
+      <div class="field-group">
+        <label class="field-label">AWS Region</label>
+        <select class="field-input" id="sso-region-input">
+          <option value="us-east-1">us-east-1 (N. Virginia)</option>
+          <option value="us-east-2">us-east-2 (Ohio)</option>
+          <option value="us-west-2">us-west-2 (Oregon)</option>
+          <option value="eu-west-1">eu-west-1 (Ireland)</option>
+          <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+          <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+          <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+        </select>
+      </div>
+      <button class="btn-login" id="btn-start-sso" onclick="startSSO()">Connect via AWS SSO →</button>
+      <div class="login-hint">💡 Enter your org's AWS SSO portal URL. You'll approve access in your browser — no credentials stored locally.</div>
+    </div>
+    <div class="step" id="step-pending">
+      <div class="sso-pending">
+        <div style="font-family:var(--font-head);font-size:1rem;margin-bottom:.5rem">Approve in Browser</div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem">Click the link below or copy your device code</div>
+        <div class="sso-url-box" id="sso-verify-url" onclick="openVerifyUrl()">Opening...</div>
+        <div style="font-size:.7rem;color:var(--muted);font-family:var(--font-mono)">Your code:</div>
+        <div class="sso-code" id="sso-user-code">——</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.5rem" class="polling-dots">Waiting for approval<span>.</span><span>.</span><span>.</span></div>
+      </div>
+    </div>
+    <div class="step" id="step-accounts">
+      <div style="font-family:var(--font-head);font-size:.95rem;margin-bottom:.5rem">Select Account & Role</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:.75rem">Choose which AWS account and role to use</div>
+      <div class="account-list" id="account-list"></div>
+    </div>
+    <div class="step" id="step-loading">
+      <div style="text-align:center;padding:1.5rem 0">
+        <div class="spinner" style="margin:0 auto 1rem"></div>
+        <div style="font-family:var(--font-head);font-size:.95rem">Fetching AWS data...</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.4rem;font-family:var(--font-mono)" id="load-status">Connecting...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ MAIN APP ════════ -->
+<div class="app" id="main-app" style="display:none">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">CG</div>
+      <div>
+        <div class="logo-text">CloudGuard Pro</div>
+        <div class="logo-ver">v2.5.0 · AWS SSO</div>
+      </div>
+    </div>
+    <div class="sidebar-account">
+      <div class="acct-id" id="sb-account">—</div>
+      <div class="acct-role" id="sb-role">—</div>
+    </div>
+    <div class="sidebar-status">
+      <span class="pulse"></span>
+      <span id="status-label" style="color:var(--lime)">LIVE DATA</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Dashboards</div>
+      <button class="nav-item active" onclick="setTab('overview',this)"><span class="nav-icon">⬡</span> Overview</button>
+      <button class="nav-item" onclick="setTab('security',this)"><span class="nav-icon">🔒</span> Security<span class="nav-badge badge-red" id="badge-sec">—</span></button>
+      <button class="nav-item" onclick="setTab('ec2',this)"><span class="nav-icon">🖥️</span> EC2<span class="nav-badge badge-amber" id="badge-ec2">—</span></button>
+      <button class="nav-item" onclick="setTab('iam',this)"><span class="nav-icon">👥</span> IAM<span class="nav-badge badge-amber" id="badge-iam">—</span></button>
+      <button class="nav-item" onclick="setTab('billing',this)"><span class="nav-icon">💸</span> Billing<span class="nav-badge badge-ok" id="badge-billing">$—</span></button>
+      <div class="nav-section">Automation</div>
+      <button class="nav-item" onclick="setTab('autofix',this)"><span class="nav-icon">🔧</span> Auto-Fix<span class="nav-badge badge-amber" id="badge-fixes">—</span></button>
+      <button class="nav-item" onclick="setTab('absence',this)"><span class="nav-icon">📅</span> Absence Mgr<span class="nav-badge badge-purple" id="badge-absence">OFF</span></button>
+      <div class="nav-section">Alerts</div>
+      <button class="nav-item" onclick="setTab('notifications',this)"><span class="nav-icon">🔔</span> Notifications<span class="nav-badge badge-ok" id="badge-notify">—</span></button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="last-scan" id="last-scan">Last scan: never</div>
+      <button class="scan-btn" id="scan-btn" onclick="runScan()">⬡ Full Scan</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Overview</div>
+        <div class="page-sub" id="page-sub">Live AWS account dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <div class="clock" id="clock">--:--:--</div>
+            <button class="icon-btn" id="theme-btn" onclick="toggleTheme()">☀️</button>
+        <button class="icon-btn" onclick="loadAllData()" title="Refresh">↻</button>
+        <button class="logout-btn" onclick="logout()">Disconnect ×</button>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- ═══ OVERVIEW ═══ -->
+      <div class="tab-content active" id="tab-overview">
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--lime),transparent)"></div>
+            <div class="metric-icon">🛡️</div>
+            <div class="metric-lbl">Security Score</div>
+            <div class="metric-val" id="m-score" style="color:var(--lime)">—</div>
+            <div class="metric-sub">/ 100</div>
+            <div class="progress-bar"><div class="progress-fill" id="score-bar" style="background:var(--lime);width:0%"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--red),transparent)"></div>
+            <div class="metric-icon">⚠️</div>
+            <div class="metric-lbl">Critical Issues</div>
+            <div class="metric-val" id="m-critical" style="color:var(--red)">—</div>
+            <div class="metric-sub">Needs immediate action</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--amber),transparent)"></div>
+            <div class="metric-icon">💰</div>
+            <div class="metric-lbl">Monthly Spend</div>
+            <div class="metric-val" id="m-cost" style="color:var(--amber)">—</div>
+            <div class="metric-sub" id="m-cost-change">Loading billing...</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--sky),transparent)"></div>
+            <div class="metric-icon">🖥️</div>
+            <div class="metric-lbl">Running Instances</div>
+            <div class="metric-val" id="m-instances" style="color:var(--sky)">—</div>
+            <div class="metric-sub" id="m-instance-cost">Estimated cost</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Cost Trends — 6 Months</div>
+              <div class="panel-badge" id="billing-currency">USD</div>
+            </div>
+            <div class="panel-body">
+              <div class="bar-chart" id="bar-chart"><div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">Loading billing data...</div></div>
+            </div>
+          </div>
+          <div class="col-stack">
+            <div class="panel">
+              <div class="score-wrap">
+                <div class="ring">
+                  <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle class="ring-track" cx="60" cy="60" r="50"/>
+                    <circle class="ring-fill" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16" id="ring-fill"/>
+                  </svg>
+                  <div class="ring-text"><div class="ring-num" id="ring-num">—</div><div class="ring-sub">Score</div></div>
+                </div>
+                <div class="score-desc" id="score-desc">Analyzing account...</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header"><div class="panel-title">Quick Actions</div></div>
+              <div class="panel-body" style="padding:1rem">
+                <div class="action-grid">
+                  <button class="action-item" onclick="loadAllData()"><div class="action-icon">↻</div><div class="action-lbl">Refresh All</div></button>
+                  <button class="action-item" onclick="downloadReport()"><div class="action-icon">📄</div><div class="action-lbl">Export PDF</div></button>
+                  <button class="action-item" onclick="setTab('autofix',document.querySelector('[onclick*=autofix]'))"><div class="action-icon">🔧</div><div class="action-lbl">Auto-Fix Issues</div></button>
+                  <button class="action-item" onclick="setTab('notifications',document.querySelector('[onclick*=notifications]'))"><div class="action-icon">📧</div><div class="action-lbl">Email Alerts</div></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Top Security Issues</div><div class="panel-badge" id="ov-sec-count">—</div></div>
+            <div class="issue-list" id="ov-sec-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Top AWS Services by Cost</div><div class="panel-badge" id="ov-svc-count">—</div></div>
+            <div class="panel-body" id="ov-svc-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading billing...</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SECURITY ═══ -->
+      <div class="tab-content" id="tab-security">
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header">
+            <div class="panel-title">🔒 S3 Bucket Security Audit</div>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <div class="panel-badge" id="sec-count">— buckets</div>
+              <button onclick="fixAllS3()" style="padding:.3rem .8rem;background:var(--lime);color:var(--ink);font-family:var(--font-head);font-weight:700;font-size:.68rem;border:none;border-radius:5px;cursor:pointer">⚡ Fix All →</button>
+            </div>
+          </div>
+          <div class="issue-list" id="sec-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+        </div>
+      </div>
+
+      <!-- ═══ EC2 ═══ -->
+      <div class="tab-content" id="tab-ec2">
+        <div class="metrics-grid" style="margin-bottom:1.25rem">
+          <div class="metric-card"><div class="metric-lbl">Running</div><div class="metric-val" id="ec2-running" style="color:var(--lime)">—</div></div>
+          <div class="metric-card"><div class="metric-lbl">Stopped</div><div class="metric-val" id="ec2-stopped" style="color:var(--muted-hi)">—</div></div>
+          <div class="metric-card"><div class="metric-lbl">Idle (stopped 7d+)</div><div class="metric-val" id="ec2-idle" style="color:var(--amber)">—</div></div>
+          <div class="metric-card"><div class="metric-lbl">Unattached Volumes</div><div class="metric-val" id="ec2-vols" style="color:var(--red)">—</div></div>
+        </div>
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">🖥️ Running Instances</div><div class="panel-badge" id="ec2-running-count">—</div></div>
+            <div class="issue-list" id="ec2-running-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">⚠️ Idle / Unused Resources</div>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <div class="panel-badge" id="ec2-idle-count">—</div>
+                <button onclick="stopAllIdle()" style="padding:.3rem .8rem;background:transparent;color:var(--amber);border:1px solid var(--amber);font-family:var(--font-mono);font-size:.62rem;border-radius:5px;cursor:pointer">Stop All</button>
+              </div>
+            </div>
+            <div class="issue-list" id="ec2-idle-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ IAM ═══ -->
+      <div class="tab-content" id="tab-iam">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">👥 IAM User Audit</div>
+            <div class="panel-badge" id="iam-count">— users</div>
+          </div>
+          <div class="issue-list" id="iam-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+        </div>
+      </div>
+
+      <!-- ═══ BILLING ═══ -->
+      <div class="tab-content" id="tab-billing">
+        <div class="metrics-grid" style="margin-bottom:1.25rem">
+          <div class="metric-card"><div class="metric-lbl">This Month</div><div class="metric-val" id="bill-current" style="color:var(--lime)">—</div><div class="metric-sub">actual spend</div></div>
+          <div class="metric-card"><div class="metric-lbl">Forecasted (EOM)</div><div class="metric-val" id="bill-forecast" style="color:var(--amber)">—</div><div class="metric-sub">projected total</div></div>
+          <div class="metric-card"><div class="metric-lbl">Last Month</div><div class="metric-val" id="bill-prev" style="color:var(--muted-hi)">—</div><div class="metric-sub">actual spend</div></div>
+          <div class="metric-card"><div class="metric-lbl">Month-over-Month</div><div class="metric-val" id="bill-change" style="color:var(--sky)">—</div><div class="metric-sub">% change</div></div>
+        </div>
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">📈 6-Month Spend Trend</div><div class="panel-badge">USD</div></div>
+            <div class="panel-body"><div class="bar-chart" id="billing-bar-chart"><div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">Loading...</div></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Top Services by Cost</div><div class="panel-badge" id="bill-svc-count">—</div></div>
+            <div class="panel-body" id="billing-svc-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ AUTO-FIX ═══ -->
+      <div class="tab-content" id="tab-autofix">
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">🔧 Auto-Fix Engine</div>
+              <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-top:.2rem">Select issues below and apply fixes directly to your AWS account</div>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <span class="fix-count-badge" id="fix-selected-count">0 selected</span>
+              <button class="run-fixes-btn" id="run-fixes-btn" onclick="applySelectedFixes()" disabled>⚡ Apply Fixes</button>
+            </div>
+          </div>
+          <div id="fix-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Run a scan first to see fixable issues</div></div></div>
+        </div>
+
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header"><div class="panel-title">📋 Fix History</div><div class="panel-badge" id="fix-history-count">0 applied</div></div>
+          <div id="fix-history-list"><div class="empty"><div class="empty-icon">·</div><div class="empty-text">No fixes applied yet this session</div></div></div>
+        </div>
+      </div>
+
+      <!-- ═══ ABSENCE MANAGEMENT ═══ -->
+      <div class="tab-content" id="tab-absence">
+        <div class="metrics-grid" style="margin-bottom:1.25rem">
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--purple),transparent)"></div>
+            <div class="metric-icon">👤</div>
+            <div class="metric-lbl">Tracked Users</div>
+            <div class="metric-val" id="abs-total" style="color:var(--purple)">—</div>
+            <div class="metric-sub">in this account</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--red),transparent)"></div>
+            <div class="metric-icon">😴</div>
+            <div class="metric-lbl">Currently Absent</div>
+            <div class="metric-val" id="abs-absent" style="color:var(--red)">—</div>
+            <div class="metric-sub">5+ day threshold</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--amber),transparent)"></div>
+            <div class="metric-icon">⚠️</div>
+            <div class="metric-lbl">At Risk</div>
+            <div class="metric-val" id="abs-risk" style="color:var(--amber)">—</div>
+            <div class="metric-sub">3–4 days inactive</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--lime),transparent)"></div>
+            <div class="metric-icon">✓</div>
+            <div class="metric-lbl">Active Plans</div>
+            <div class="metric-val" id="abs-plans" style="color:var(--lime)">—</div>
+            <div class="metric-sub">scheduled absence plans</div>
+          </div>
+        </div>
+
+        <!-- Create Plan Form -->
+        <div class="plan-form">
+          <div style="font-family:var(--font-head);font-size:.88rem;font-weight:700;margin-bottom:.875rem">📅 Create Absence Plan</div>
+          <div class="plan-form-grid">
+            <div class="form-field">
+              <label class="form-label">User ID / Email</label>
+              <input class="form-input" id="plan-user" placeholder="alice@company.com" type="text">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Absence Duration (days)</label>
+              <input class="form-input" id="plan-days" type="number" min="1" max="365" value="7">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Start Date</label>
+              <input class="form-input" id="plan-start" type="date">
+            </div>
+          </div>
+          <div class="plan-form-grid" style="margin-bottom:.875rem">
+            <div class="form-field">
+              <label class="form-label">Notification Email</label>
+              <input class="form-input" id="plan-email" type="email" placeholder="admin@company.com">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Keep Running (instance IDs, comma-sep)</label>
+              <input class="form-input" id="plan-keep" type="text" placeholder="i-12345678, i-87654321">
+            </div>
+          </div>
+          <button class="create-plan-btn" onclick="createAbsencePlan()">📅 Create Absence Plan & Send Email</button>
+        </div>
+
+        <!-- User status cards -->
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header"><div class="panel-title">👤 User Activity Monitor</div><button onclick="refreshAbsenceStatus()" style="padding:.28rem .65rem;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted-hi);font-size:.65rem;cursor:pointer;font-family:var(--font-mono)">↻ Refresh</button></div>
+          <div style="padding:1.25rem">
+            <div class="absence-grid" id="absence-user-grid">
+              <div class="empty" style="grid-column:1/-1"><div class="empty-icon">⟳</div><div class="empty-text">Loading user activity... (requires a scan first)</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plan timeline preview -->
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">📋 Absence Day-by-Day Plan</div><div class="panel-badge" id="plan-days-badge">No active plan</div></div>
+          <div class="panel-body" id="plan-timeline">
+            <div class="empty"><div class="empty-icon">📅</div><div class="empty-text">Create a plan above to see the day-by-day schedule</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ NOTIFICATIONS ═══ -->
+      <div class="tab-content" id="tab-notifications">
+
+        <!-- Email config status -->
+        <div class="email-config-grid" style="margin-bottom:1.25rem">
+          <div class="email-status-card" id="smtp-status-card">
+            <div class="email-status-icon" id="smtp-icon">⏳</div>
+            <div class="email-status-label" id="smtp-label">Checking SMTP...</div>
+            <div class="email-status-detail" id="smtp-detail">Loading configuration status</div>
+          </div>
+          <div class="email-status-card">
+            <div class="email-status-icon">📧</div>
+            <div class="email-status-label">Alert Email</div>
+            <div class="email-status-detail" id="alert-email-display">—</div>
+          </div>
+        </div>
+
+        <!-- Test email -->
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header"><div class="panel-title">✉️ Send Test Email</div></div>
+          <div class="test-email-form">
+            <input class="test-email-input" id="test-email-to" type="email" placeholder="recipient@example.com">
+            <button class="test-email-btn" id="test-email-btn" onclick="sendTestEmail()">Send Test →</button>
+          </div>
+          <div style="padding:.5rem 1.375rem 1rem;font-family:var(--font-mono);font-size:.65rem;color:var(--muted)">Configure SMTP_USER, SMTP_PASS, ALERT_EMAIL in your .env file to enable email alerts.</div>
+        </div>
+
+        <!-- Alert types -->
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header">
+            <div class="panel-title">🔔 Alert Configuration</div>
+            <div class="panel-badge">Auto-triggered on scan</div>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-info">
+              <div class="notif-name">🔴 Critical Security Alert</div>
+              <div class="notif-desc">Sent when critical S3 or IAM issues are found during a scan</div>
+            </div>
+            <div class="notif-actions">
+              <button class="btn-send" onclick="sendSecurityAlertNow()">Send Now</button>
+              <label class="toggle-switch"><input type="checkbox" id="toggle-security" checked><span class="toggle-track"></span></label>
+            </div>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-info">
+              <div class="notif-name">💰 Cost Threshold Alert</div>
+              <div class="notif-desc">Sent when monthly spend exceeds configured threshold ($<span id="cost-threshold-display">500</span>)</div>
+            </div>
+            <div class="notif-actions">
+              <button class="btn-send" onclick="sendCostAlertNow()">Send Now</button>
+              <label class="toggle-switch"><input type="checkbox" id="toggle-cost" checked><span class="toggle-track"></span></label>
+            </div>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-info">
+              <div class="notif-name">😴 Absence Warning (3 days)</div>
+              <div class="notif-desc">Sent when a user has been inactive for 3+ days</div>
+            </div>
+            <div class="notif-actions">
+              <label class="toggle-switch"><input type="checkbox" id="toggle-absence3" checked><span class="toggle-track"></span></label>
+            </div>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-info">
+              <div class="notif-name">🛑 Auto-Stop Services (5 days)</div>
+              <div class="notif-desc">Sent when user is 5+ days absent and services are being stopped</div>
+            </div>
+            <div class="notif-actions">
+              <label class="toggle-switch"><input type="checkbox" id="toggle-absence5" checked><span class="toggle-track"></span></label>
+            </div>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-info">
+              <div class="notif-name">🔧 Auto-Fix Results</div>
+              <div class="notif-desc">Sent after auto-fix runs listing all applied changes</div>
+            </div>
+            <div class="notif-actions">
+              <label class="toggle-switch"><input type="checkbox" id="toggle-autofix" checked><span class="toggle-track"></span></label>
+            </div>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-info">
+              <div class="notif-name">📊 Weekly Summary</div>
+              <div class="notif-desc">Weekly digest with score, issues count, and cost changes</div>
+            </div>
+            <div class="notif-actions">
+              <button class="btn-send" onclick="sendWeeklySummaryNow()">Send Now</button>
+              <label class="toggle-switch"><input type="checkbox" id="toggle-weekly" checked><span class="toggle-track"></span></label>
+            </div>
+          </div>
+        </div>
+
+        
+
+<!-- Scan overlay -->
+<div class="scan-overlay" id="scan-overlay">
+  <div class="scan-modal">
+    <div class="scan-line"></div>
+    <div style="font-size:1.75rem;margin-bottom:.4rem">⬡</div>
+    <div style="font-family:var(--font-head);font-size:1.05rem;margin-bottom:.25rem">Full Scan Running</div>
+    <div style="font-family:var(--font-mono);font-size:.68rem;color:var(--muted)">Querying your AWS account...</div>
+    <div class="scan-steps" id="scan-steps">
+      <div class="scan-step active"><span class="step-icon">›</span>S3 bucket security</div>
+      <div class="scan-step"><span class="step-icon">·</span>EC2 instances & volumes</div>
+      <div class="scan-step"><span class="step-icon">·</span>IAM users & policies</div>
+      <div class="scan-step"><span class="step-icon">·</span>Billing & cost data</div>
+      <div class="scan-step"><span class="step-icon">·</span>Building fix queue</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const API = "https://automated-cloud-security-and-cost.onrender.com";
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let S = {
+  sessionId: localStorage.getItem('cg_session') || null,
+  accountId:  localStorage.getItem('cg_account') || null,
+  roleName:   localStorage.getItem('cg_role') || null,
+  pollTimer: null,
+  data: { s3: null, ec2: null, iam: null, billing: null },
+  fixHistory: [],
+  absenceUsers: [],
+  activePlans: {}
+};
+(function initTheme() {
+  const saved = localStorage.getItem('cg_theme') || 'dark';
+  if (saved === 'light') applyTheme('light');
+})();
+
+function toggleTheme() {
+  const isLight = document.body.classList.contains('light');
+  applyTheme(isLight ? 'dark' : 'light');
+}
+
+function applyTheme(theme) {
+  const btn = document.getElementById('theme-btn');
+  if (theme === 'light') {
+    document.body.classList.add('light');
+    if (btn) btn.textContent = '🌙';
+    localStorage.setItem('cg_theme', 'light');
+  } else {
+    document.body.classList.remove('light');
+    if (btn) btn.textContent = '☀️';
+    localStorage.setItem('cg_theme', 'dark');
+  }
+}
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.onload = async () => {
+  setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString(), 1000);
+  // Set default date for plan form
+  document.getElementById('plan-start').value = new Date().toISOString().split('T')[0];
+
+  if (S.sessionId && S.accountId) {
+    try {
+      const r = await api('GET', `/auth/session/${S.sessionId}`);
+      if (r.hasCredentials) { showApp(); loadAllData(); checkEmailConfig(); return; }
+    } catch {}
+  }
+  document.getElementById('login-screen').style.display = 'flex';
+};
+
+// ─── SSO LOGIN ────────────────────────────────────────────────────────────────
+async function startSSO() {
+  const url    = document.getElementById('sso-url-input').value.trim();
+  const region = document.getElementById('sso-region-input').value;
+  if (!url) { toast('Enter your AWS SSO start URL', 'error'); return; }
+  const btn = document.getElementById('btn-start-sso');
+  btn.disabled = true; btn.textContent = 'Connecting...';
+  try {
+    const r = await api('POST', '/auth/start', { startUrl: url, region });
+    S.sessionId = r.sessionId;
+    localStorage.setItem('cg_session', r.sessionId);
+    showStep('step-pending');
+    document.getElementById('sso-verify-url').textContent = r.verificationUriComplete;
+    document.getElementById('sso-user-code').textContent  = r.userCode;
+    window.open(r.verificationUriComplete, '_blank');
+    S.pollTimer = setInterval(() => pollAuth(), (r.interval || 5) * 1000);
+  } catch (err) {
+    toast('Failed to connect: ' + err.message, 'error');
+    btn.disabled = false; btn.textContent = 'Connect via AWS SSO →';
+  }
+}
+
+function openVerifyUrl() {
+  const url = document.getElementById('sso-verify-url').textContent;
+  if (url && url !== 'Opening...') window.open(url, '_blank');
+}
+
+async function pollAuth() {
+  try {
+    const r = await api('POST', '/auth/poll', { sessionId: S.sessionId });
+    if (r.status === 'authorized') { clearInterval(S.pollTimer); renderAccountList(r.accounts); }
+  } catch {}
+}
+
+function renderAccountList(accounts) {
+  showStep('step-accounts');
+  const list = document.getElementById('account-list');
+  if (!accounts || !accounts.length) { list.innerHTML = '<div style="color:var(--muted);font-size:.8rem">No accounts found</div>'; return; }
+  list.innerHTML = accounts.map(acc => `
+  <div class="account-item">
+    <div style="font-weight:600;font-size:.85rem">${acc.accountName || 'Unnamed Account'}</div>
+    <div class="account-id">${acc.accountId}</div>
+    ${acc.email ? `<div style="font-size:.68rem;color:var(--muted);margin-top:.1rem">${acc.email}</div>` : ''}
+    <div class="role-list">
+      ${(acc.roles || []).map(role => `<div class="role-chip" onclick="selectAccount('${acc.accountId}','${role.roleName}')">${role.roleName}</div>`).join('')}
+      ${!acc.roles?.length ? '<div style="font-size:.68rem;color:var(--muted)">No roles available</div>' : ''}
+    </div>
+  </div>`).join('');
+}
+
+async function selectAccount(accountId, roleName) {
+  showStep('step-loading');
+  document.getElementById('load-status').textContent = 'Getting temporary credentials...';
+  try {
+    await api('POST', '/auth/select', { sessionId: S.sessionId, accountId, roleName });
+    S.accountId = accountId; S.roleName = roleName;
+    localStorage.setItem('cg_account', accountId);
+    localStorage.setItem('cg_role', roleName);
+    showApp();
+    await loadAllData();
+    checkEmailConfig();
+  } catch (err) {
+    toast('Failed to get credentials: ' + err.message, 'error');
+    showStep('step-accounts');
+  }
+}
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'grid';
+  document.getElementById('sb-account').textContent = S.accountId || '—';
+  document.getElementById('sb-role').textContent    = S.roleName  || '—';
+}
+
+function logout() {
+  if (!confirm('Disconnect from AWS?')) return;
+  if (S.sessionId) fetch(`${API}/api/auth/session/${S.sessionId}`, { method: 'DELETE' }).catch(()=>{});
+  localStorage.clear();
+  location.reload();
+}
+
+// ─── DATA LOADING ────────────────────────────────────────────────────────────
+async function loadAllData() {
+  toast('Fetching live AWS data...', 'info');
+  document.getElementById('status-label').textContent = 'SYNCING...';
+  try {
+    const overview = await api('GET', '/aws/overview');
+    S.data.s3      = overview.s3;
+    S.data.ec2     = overview.ec2;
+    S.data.iam     = overview.iam;
+    S.data.billing = overview.billing;
+    renderAll();
+    buildFixQueue();
+    document.getElementById('last-scan').textContent = 'Last scan: ' + new Date().toLocaleTimeString();
+    document.getElementById('status-label').textContent = 'LIVE DATA';
+    toast('AWS data loaded', 'success');
+  } catch (err) {
+    toast('API error: ' + err.message + ' — is backend running?', 'error');
+    document.getElementById('status-label').textContent = 'OFFLINE';
+  }
+}
+
+// ─── RENDER ALL ──────────────────────────────────────────────────────────────
+function renderAll() {
+  renderOverview();
+  renderSecurity();
+  renderEC2();
+  renderIAM();
+  renderBilling();
+}
+
+function renderOverview() {
+  const s3  = S.data.s3  || {};
+  const ec2 = S.data.ec2 || {};
+  const iam = S.data.iam || {};
+  const bil = S.data.billing || {};
+  const criticalS3 = (s3.vulnerableBuckets || []).filter(b => b.severity === 'critical').length;
+  const iamHigh    = (iam.summary || {}).highSeverity || 0;
+  const critical   = criticalS3 + iamHigh;
+  const vulnPct    = Math.min(100, ((s3.vulnerableCount || 0) / Math.max(1, s3.totalBuckets || 1)) * 100);
+  const iamPct     = Math.min(100, (((iam.summary || {}).usersWithIssues || 0) / Math.max(1, (iam.summary || {}).totalUsers || 1)) * 100);
+  const score      = Math.round(100 - (vulnPct * 0.6) - (iamPct * 0.4));
+  setText('m-score', score);
+  setText('m-critical', critical);
+  setText('m-instances', (ec2.summary || {}).runningInstances ?? '—');
+  setText('m-instance-cost', '$' + fmt((ec2.summary || {}).estimatedMonthlyCost) + '/mo estimated');
+  const costCurrent = (bil.summary || {}).currentMonthCost;
+  setText('m-cost', costCurrent != null ? '$' + fmt(costCurrent) : '—');
+  const ch = (bil.summary || {}).percentChange;
+  setText('m-cost-change', ch != null ? `${ch > 0 ? '+' : ''}${ch}% vs last month` : 'Billing data');
+  const ringFill = document.getElementById('ring-fill');
+  const circ = 314.16;
+  ringFill.style.strokeDashoffset = circ - (circ * score / 100);
+  ringFill.style.stroke = score >= 80 ? 'var(--lime)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+  setText('ring-num', score);
+  document.getElementById('score-bar').style.width = score + '%';
+  setText('score-desc', score >= 80 ? 'Good posture. Minor issues detected.' : score >= 60 ? 'Some vulnerabilities need attention.' : 'Critical issues found — act now.');
+  setText('badge-sec', s3.vulnerableCount ?? '—');
+  setText('badge-ec2', (ec2.summary || {}).idleInstances ?? '—');
+  setText('badge-iam', (iam.summary || {}).usersWithIssues ?? '—');
+  setText('badge-billing', costCurrent != null ? '$' + fmt(costCurrent) : '$—');
+  const vulnBuckets = (s3.vulnerableBuckets || []).slice(0, 4);
+  setText('ov-sec-count', vulnBuckets.length + ' issues');
+  document.getElementById('ov-sec-list').innerHTML = vulnBuckets.length
+    ? vulnBuckets.map(b => issueRow(b.name, b.issues?.join(', ') || '', b.severity)).join('')
+    : empty('No S3 vulnerabilities detected ✅');
+  const svcs = (bil.serviceBreakdown || []).slice(0, 5);
+  const maxSvc = svcs[0]?.cost || 1;
+  setText('ov-svc-count', svcs.length + ' services');
+  document.getElementById('ov-svc-list').innerHTML = svcs.length
+    ? svcs.map(s => `<div class="service-row"><div class="service-name">${s.service.replace('Amazon ','').replace('AWS ','')}</div><div class="service-bar-wrap"><div class="service-bar-fill" style="width:${Math.round(s.cost/maxSvc*100)}%"></div></div><div class="service-cost">$${s.cost.toFixed(0)}</div></div>`).join('')
+    : empty('No billing data available');
+  renderBarChart('bar-chart', bil.monthlyTrend || []);
+}
+
+function renderSecurity() {
+  const s3 = S.data.s3 || {};
+  const buckets = s3.buckets || [];
+  setText('sec-count', buckets.length + ' buckets audited');
+  document.getElementById('sec-list').innerHTML = buckets.length
+    ? buckets.map(b => issueRowWithFix(
+        b.name, b.issues?.length ? b.issues.join(' · ') : '✅ All checks passed', b.severity === 'ok' ? 'ok' : b.severity,
+        b.severity !== 'ok', () => fixS3Bucket(b.name, b.issues || [])
+      )).join('')
+    : empty('Loading security data...');
+}
+
+function renderEC2() {
+  const ec2 = S.data.ec2 || {};
+  const s = ec2.summary || {};
+  const inst = ec2.instances || {};
+  const storage = ec2.storage || {};
+  setText('ec2-running', s.runningInstances ?? '—');
+  setText('ec2-stopped', s.stoppedInstances ?? '—');
+  setText('ec2-idle', s.idleInstances ?? '—');
+  setText('ec2-vols', s.unusedVolumes ?? '—');
+  const running = inst.running || [];
+  setText('ec2-running-count', running.length + ' instances');
+  document.getElementById('ec2-running-list').innerHTML = running.length
+    ? running.map(i => issueRow(i.name || i.instanceId, `${i.instanceType} · ${i.az || '—'} · $${i.monthlyCost}/mo`, 'ok', false)).join('')
+    : empty('No running instances');
+  const idle = [...(inst.idle || []), ...(storage.unusedVolumes || [])];
+  setText('ec2-idle-count', idle.length + ' resources');
+  document.getElementById('ec2-idle-list').innerHTML = idle.length
+    ? idle.map(r => issueRowWithFix(
+        r.instanceId || r.volumeId || '—',
+        r.instanceType ? `Stopped instance · ${r.instanceType} · $${r.monthlyCost}/mo` : `Unattached volume · ${r.sizeGB}GB · $${r.monthlyCost}/mo`,
+        'medium', true, () => fixEC2Resource(r)
+      )).join('')
+    : empty('No idle resources — optimized! ✅');
+}
+
+function renderIAM() {
+  const iam = S.data.iam || {};
+  const users = iam.usersWithIssues || [];
+  setText('iam-count', (iam.summary?.totalUsers ?? '—') + ' users total');
+  document.getElementById('iam-list').innerHTML = users.length
+    ? users.map(u => issueRowWithFix(u.username, u.issues.join(' · '), u.severity, true, () => fixIAMUser(u))).join('')
+    : empty('No IAM permission issues detected ✅');
+}
+
+function renderBilling() {
+  const bil = S.data.billing || {};
+  const s   = bil.summary || {};
+  setText('bill-current',  s.currentMonthCost  != null ? '$' + fmt(s.currentMonthCost)  : '—');
+  setText('bill-forecast', s.forecastedCost     != null ? '$' + fmt(s.forecastedCost)    : '—');
+  setText('bill-prev',     s.previousMonthCost  != null ? '$' + fmt(s.previousMonthCost) : '—');
+  const ch = s.percentChange;
+  const chEl = document.getElementById('bill-change');
+  chEl.textContent = ch != null ? `${ch > 0 ? '+' : ''}${ch}%` : '—';
+  chEl.style.color = ch == null ? 'var(--muted-hi)' : ch > 5 ? 'var(--red)' : ch < 0 ? 'var(--lime)' : 'var(--sky)';
+  renderBarChart('billing-bar-chart', bil.monthlyTrend || []);
+  const svcs = bil.serviceBreakdown || [];
+  const maxS = svcs[0]?.cost || 1;
+  setText('bill-svc-count', svcs.length + ' services');
+  document.getElementById('billing-svc-list').innerHTML = svcs.length
+    ? svcs.map(s => `<div class="service-row"><div class="service-name">${s.service.replace('Amazon ','').replace('AWS ','')}</div><div class="service-bar-wrap"><div class="service-bar-fill" style="width:${Math.round(s.cost/maxS*100)}%"></div></div><div class="service-cost">$${s.cost.toFixed(2)}</div></div>`).join('')
+    : empty('No billing data available');
+}
+
+// ─── AUTO-FIX ENGINE ────────────────────────────────────────────────────────
+let fixQueue = [];
+
+function buildFixQueue() {
+  fixQueue = [];
+  const s3 = S.data.s3 || {};
+  const ec2 = S.data.ec2 || {};
+  const iam = S.data.iam || {};
+
+  // S3 fixes
+  (s3.vulnerableBuckets || []).forEach(b => {
+    (b.issues || []).forEach(issue => {
+      if (issue.includes('Public') || issue.includes('public')) {
+        fixQueue.push({ fixId: 's3-block-public-access', resource: `s3://${b.name}`, label: `Block public access on ${b.name}`, severity: b.severity, params: { bucket: b.name }, selected: false });
+      }
+      if (issue.includes('ncrypt')) {
+        fixQueue.push({ fixId: 's3-enable-encryption', resource: `s3://${b.name}`, label: `Enable encryption on ${b.name}`, severity: b.severity, params: { bucket: b.name }, selected: false });
+      }
+      if (issue.includes('ersion')) {
+        fixQueue.push({ fixId: 's3-enable-versioning', resource: `s3://${b.name}`, label: `Enable versioning on ${b.name}`, severity: b.severity, params: { bucket: b.name }, selected: false });
+      }
+    });
+  });
+
+  // EC2 idle fixes
+  ((ec2.instances || {}).idle || []).forEach(i => {
+    fixQueue.push({ fixId: 'ec2-stop-idle', resource: i.instanceId, label: `Stop idle instance ${i.instanceId} ($${i.monthlyCost}/mo)`, severity: 'medium', params: { instanceId: i.instanceId }, selected: false });
+  });
+
+  // EC2 unattached volumes
+  ((ec2.storage || {}).unusedVolumes || []).forEach(v => {
+    fixQueue.push({ fixId: 'ec2-delete-unattached-volume', resource: v.volumeId, label: `Delete unattached volume ${v.volumeId} (${v.sizeGB}GB)`, severity: 'medium', params: { volumeId: v.volumeId }, selected: false });
+  });
+
+  // IAM fixes
+  (iam.usersWithIssues || []).forEach(u => {
+    if ((u.issues || []).some(i => i.includes('key') || i.includes('Key'))) {
+      fixQueue.push({ fixId: 'iam-disable-old-key', resource: `iam:${u.username}`, label: `Disable old access keys for ${u.username}`, severity: u.severity, params: { username: u.username, accessKeyId: u.oldKeyId || '' }, selected: false });
+    }
+  });
+
+  renderFixQueue();
+  setText('badge-fixes', fixQueue.length || '0');
+}
+
+function renderFixQueue() {
+  const list = document.getElementById('fix-list');
+  if (!fixQueue.length) { list.innerHTML = empty('No fixable issues found — account looks clean ✅'); return; }
+  list.innerHTML = fixQueue.map((fix, i) => {
+    const sevColor = { critical:'var(--red)', high:'var(--amber)', medium:'var(--sky)', low:'var(--muted)' }[fix.severity] || 'var(--muted)';
+    return `<div class="fix-item" id="fix-item-${i}">
+      <input type="checkbox" class="fix-checkbox" ${fix.selected ? 'checked' : ''} onchange="toggleFix(${i}, this.checked)">
+      <div class="fix-item-info">
+        <div class="fix-item-name">${fix.label}</div>
+        <div class="fix-item-detail">${fix.resource} · Fix: <span style="color:var(--lime)">${fix.fixId}</span></div>
+      </div>
+      <span class="fix-item-risk sev-tag tag-${fix.severity}">${fix.severity}</span>
+    </div>`;
+  }).join('');
+  updateFixCount();
+}
+
+function toggleFix(i, checked) {
+  fixQueue[i].selected = checked;
+  document.getElementById(`fix-item-${i}`).classList.toggle('selected', checked);
+  updateFixCount();
+}
+
+function updateFixCount() {
+  const n = fixQueue.filter(f => f.selected).length;
+  setText('fix-selected-count', n + ' selected');
+  document.getElementById('run-fixes-btn').disabled = n === 0;
+}
+
+async function applySelectedFixes() {
+  const selected = fixQueue.filter(f => f.selected);
+  if (!selected.length) return;
+  const btn = document.getElementById('run-fixes-btn');
+  btn.disabled = true; btn.textContent = '⟳ Fixing...';
+  toast(`Applying ${selected.length} fixes to AWS...`, 'warn');
+  try {
+    const result = await api('POST', '/notify/autofix', {
+      fixes: selected.map(f => ({ fixId: f.fixId, resource: f.resource, params: f.params })),
+      notifyEmail: document.getElementById('test-email-to').value || null
+    });
+    const succeeded = result.results.filter(r => r.status === 'success').length;
+    toast(`✓ ${succeeded}/${result.total} fixes applied`, succeeded === result.total ? 'success' : 'warn');
+    // Add to history
+    S.fixHistory = [...result.results, ...S.fixHistory];
+    renderFixHistory();
+    // Remove successful fixes from queue
+    fixQueue = fixQueue.filter(f => {
+      const res = result.results.find(r => r.resource === f.resource);
+      return !res || res.status !== 'success';
+    });
+    renderFixQueue();
+    await loadAllData();
+  } catch (err) {
+    toast('Auto-fix failed: ' + err.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '⚡ Apply Fixes';
+}
+
+function renderFixHistory() {
+  const list = document.getElementById('fix-history-list');
+  setText('fix-history-count', S.fixHistory.length + ' applied');
+  if (!S.fixHistory.length) { list.innerHTML = empty('No fixes applied yet this session'); return; }
+  list.innerHTML = S.fixHistory.slice(0, 20).map(f => `
+    <div class="fix-item">
+      <div class="fix-item-info">
+        <div class="fix-item-name">${f.action || f.fixId}</div>
+        <div class="fix-item-detail">${f.resource} · ${f.details || ''} · <span style="color:var(--muted)">${f.timestamp ? new Date(f.timestamp).toLocaleTimeString() : ''}</span></div>
+      </div>
+      <span class="${f.status === 'success' ? 'fix-result-success' : 'fix-result-failed'}">${f.status === 'success' ? '✓ Fixed' : '✕ Failed'}</span>
+    </div>`).join('');
+}
+
+async function fixS3Bucket(bucket, issues) {
+  const fixes = [];
+  if (issues.some(i => i.includes('Public') || i.includes('public'))) fixes.push({ fixId: 's3-block-public-access', resource: `s3://${bucket}`, params: { bucket } });
+  if (issues.some(i => i.includes('ncrypt'))) fixes.push({ fixId: 's3-enable-encryption', resource: `s3://${bucket}`, params: { bucket } });
+  if (!fixes.length) { toast('No auto-fixable issues for ' + bucket, 'info'); return; }
+  await runFixes(fixes);
+}
+
+async function fixEC2Resource(r) {
+  const fix = r.instanceId
+    ? { fixId: 'ec2-stop-idle', resource: r.instanceId, params: { instanceId: r.instanceId } }
+    : { fixId: 'ec2-delete-unattached-volume', resource: r.volumeId, params: { volumeId: r.volumeId } };
+  await runFixes([fix]);
+}
+
+async function fixIAMUser(u) {
+  const fixes = [{ fixId: 'iam-disable-old-key', resource: `iam:${u.username}`, params: { username: u.username, accessKeyId: u.oldKeyId || '' } }];
+  await runFixes(fixes);
+}
+
+async function fixAllS3() {
+  const s3 = S.data.s3 || {};
+  const fixes = [];
+  (s3.vulnerableBuckets || []).forEach(b => {
+    if (b.issues?.some(i => i.includes('Public') || i.includes('public'))) fixes.push({ fixId: 's3-block-public-access', resource: `s3://${b.name}`, params: { bucket: b.name } });
+    if (b.issues?.some(i => i.includes('ncrypt'))) fixes.push({ fixId: 's3-enable-encryption', resource: `s3://${b.name}`, params: { bucket: b.name } });
+  });
+  if (!fixes.length) { toast('No S3 issues to fix', 'info'); return; }
+  await runFixes(fixes);
+}
+
+async function stopAllIdle() {
+  const ec2 = S.data.ec2 || {};
+  const fixes = ((ec2.instances || {}).idle || []).map(i => ({ fixId: 'ec2-stop-idle', resource: i.instanceId, params: { instanceId: i.instanceId } }));
+  if (!fixes.length) { toast('No idle instances to stop', 'info'); return; }
+  if (!confirm(`Stop ${fixes.length} idle EC2 instances?`)) return;
+  await runFixes(fixes);
+}
+
+async function runFixes(fixes) {
+  toast(`Applying ${fixes.length} fix(es)...`, 'warn');
+  try {
+    const result = await api('POST', '/notify/autofix', { fixes });
+    const ok = result.results.filter(r => r.status === 'success').length;
+    toast(`✓ ${ok}/${result.total} fixes applied`, ok === result.total ? 'success' : 'warn');
+    S.fixHistory = [...result.results, ...S.fixHistory];
+    renderFixHistory();
+    await loadAllData();
+  } catch (err) {
+    toast('Fix failed: ' + err.message, 'error');
+  }
+}
+
+// ─── ABSENCE MANAGEMENT ────────────────────────────────────────────────────────
+async function refreshAbsenceStatus() {
+  try {
+    const result = await api('GET', '/notify/absence/status');
+    S.absenceUsers = result.users || [];
+    renderAbsenceUsers();
+  } catch (err) {
+    toast('Absence status error: ' + err.message, 'error');
+  }
+}
+
+function renderAbsenceUsers() {
+  const grid = document.getElementById('absence-user-grid');
+  const users = S.absenceUsers;
+  const absent = users.filter(u => u.daysMissing >= 5).length;
+  const atRisk = users.filter(u => u.daysMissing >= 3 && u.daysMissing < 5).length;
+
+  setText('abs-total', users.length || '—');
+  setText('abs-absent', absent);
+  setText('abs-risk', atRisk);
+  setText('abs-plans', Object.keys(S.activePlans).length);
+  setText('badge-absence', absent > 0 ? absent + ' absent' : 'ON');
+
+  if (!users.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">👤</div><div class="empty-text">No users tracked yet. Activity is recorded on each scan.</div></div>';
+    return;
+  }
+
+  grid.innerHTML = users.map(u => {
+    const pct = Math.min(100, (u.daysMissing / 5) * 100);
+    const cls = u.daysMissing >= 5 ? 'absent' : u.daysMissing >= 3 ? 'at-risk' : 'active';
+    const color = u.daysMissing >= 5 ? 'var(--red)' : u.daysMissing >= 3 ? 'var(--amber)' : 'var(--lime)';
+    const status = u.daysMissing >= 5 ? 'SERVICES STOPPED' : u.daysMissing >= 3 ? 'AT RISK' : 'ACTIVE';
+    return `<div class="user-card ${cls}">
+      <div class="user-card-top">
+        <div><div class="user-name">${u.userId}</div><div class="user-id">${u.accountId}</div></div>
+        <div><div class="days-badge" style="color:${color}">${u.daysMissing}</div><div class="days-label">days absent</div></div>
+      </div>
+      <div class="user-progress"><div class="user-progress-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div style="font-family:var(--font-mono);font-size:.6rem;color:${color};">${status}</div>
+      <div class="user-actions-row">
+        <button class="user-action-btn" onclick="resumeUser('${u.userId}')">✓ Mark Active</button>
+        <button class="user-action-btn" onclick="stopUserServices('${u.userId}')">⏸ Stop Services</button>
+        <button class="user-action-btn danger" onclick="removeUser('${u.userId}')">✕ Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+let _planLock = false;
+async function createAbsencePlan() {
+  if (_planLock) { toast('Plan already being created, please wait...', 'warn'); return; }
+  _planLock = true;
+
+  const userId     = document.getElementById('plan-user').value.trim();
+  const totalDays  = parseInt(document.getElementById('plan-days').value);
+  const startDate  = document.getElementById('plan-start').value;
+  const email      = document.getElementById('plan-email').value.trim();
+  const keepRaw    = document.getElementById('plan-keep').value.trim();
+  const keepRunning = keepRaw ? keepRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  if (!userId || !totalDays) { toast('User ID and duration are required', 'error'); _planLock = false; return; }
+
+  try {
+    const result = await api('POST', '/notify/absence/plan', { userId, totalDays, startDate, keepRunning, notifyEmail: email });
+    S.activePlans[userId] = result.plan;
+    toast(`Absence plan created for ${userId}`, 'success');
+    if (email) toast(`Plan emailed to ${email}`, 'info');
+    renderAbsencePlan(result.plan);
+    refreshAbsenceStatus();
+  } catch (err) {
+    toast('Plan creation failed: ' + err.message, 'error');
+  } finally {
+    setTimeout(() => { _planLock = false; }, 5000); // unlock after 5s
+  }
+}
+function renderAbsencePlan(plan) {
+  setText('plan-days-badge', `${plan.totalDays} days — ${plan.userId}`);
+  const timeline = document.getElementById('plan-timeline');
+  const dotClass = { low: 'day-dot-ok', medium: 'day-dot-warn', high: 'day-dot-warn', critical: 'day-dot-danger' };
+  timeline.innerHTML = `<div class="day-timeline">
+    ${plan.days.map((d, i) => `
+      <div class="day-row">
+        <div class="day-line-col">
+          <div class="day-dot ${dotClass[d.risk] || 'day-dot-ok'}"></div>
+          ${i < plan.days.length - 1 ? '<div class="day-connector"></div>' : ''}
+        </div>
+        <div class="day-content">
+          <div class="day-num">DAY ${d.day}</div>
+          <div class="day-date">${d.date}</div>
+          <div class="day-actions-list">${d.actions.map(a => `<span class="day-action-chip">${a}</span>`).join('')}</div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+async function resumeUser(userId) {
+  try {
+    await api('POST', `/notify/absence/resume/${userId}`);
+    toast(`${userId} marked as active — services resumed`, 'success');
+    refreshAbsenceStatus();
+  } catch (err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+async function stopUserServices(userId) {
+  if (!confirm(`Stop all AWS services for ${userId}?`)) return;
+  try {
+    const result = await api('POST', '/notify/absence/stop-services', { keepRunning: [] });
+    toast(`Stopped ${result.total || 0} services for ${userId}`, 'warn');
+  } catch (err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+function removeUser(userId) {
+  S.absenceUsers = S.absenceUsers.filter(u => u.userId !== userId);
+  delete S.activePlans[userId];
+  renderAbsenceUsers();
+}
+
+// ─── EMAIL / NOTIFICATIONS ─────────────────────────────────────────────────────
+async function checkEmailConfig() {
+  try {
+    const config = await api('GET', '/notify/config');
+    const card = document.getElementById('smtp-status-card');
+    if (config.configured) {
+      card.classList.add('configured');
+      setText('smtp-icon', '✅');
+      const providerLabel = { resend: 'Resend Connected', sendgrid: 'SendGrid Connected', smtp: 'SMTP Connected' };
+const providerDetail = { resend: 'Sending via Resend API', sendgrid: 'Sending via SendGrid API', smtp: config.smtp?.user || 'Connected' };
+setText('smtp-label', providerLabel[config.provider] || 'Email Connected');
+setText('smtp-detail', providerDetail[config.provider] || 'Provider active');
+      setText('badge-notify', 'ON');
+    } else {
+      card.classList.add('not-configured');
+      setText('smtp-icon', '⚠️');
+      setText('smtp-label', 'Email Not Configured');
+      setText('smtp-detail', 'Add SENDGRID_API_KEY or SMTP_USER + SMTP_PASS');
+      setText('badge-notify', 'OFF');
+    }
+    if (config.alertEmail) setText('alert-email-display', config.alertEmail);
+  } catch {}
+}
+async function sendTestEmail() {
+  const to = document.getElementById('test-email-to').value.trim();
+  const btn = document.getElementById('test-email-btn');
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try {
+    await api('POST', '/notify/test', { to: to || undefined });
+    toast('Test email sent! Check your inbox.', 'success');
+  } catch (err) { toast('Email failed: ' + err.message, 'error'); }
+  btn.disabled = false; btn.textContent = 'Send Test →';
+}
+
+async function sendSecurityAlertNow() {
+  const s3 = S.data.s3 || {};
+  const iam = S.data.iam || {};
+  const issues = [
+    ...(s3.vulnerableBuckets || []).map(b => ({ severity: b.severity, resource: `s3://${b.name}`, issues: b.issues })),
+    ...(iam.usersWithIssues || []).map(u => ({ severity: u.severity, resource: `iam:${u.username}`, issues: u.issues }))
+  ];
+  if (!issues.length) { toast('No issues to report', 'info'); return; }
+  try {
+    await api('POST', '/notify/security', { issues });
+    toast('Security alert email sent!', 'success');
+  } catch (err) { toast('Email failed: ' + err.message, 'error'); }
+}
+
+async function sendCostAlertNow() {
+  const bil = S.data.billing || {};
+  const s   = bil.summary || {};
+  try {
+    await api('POST', '/notify/cost', { currentCost: s.currentMonthCost, forecastedCost: s.forecastedCost, threshold: 500 });
+    toast('Cost alert email sent!', 'success');
+  } catch (err) { toast('Email failed: ' + err.message, 'error'); }
+}
+
+async function sendWeeklySummaryNow() {
+  const s3  = S.data.s3  || {};
+  const bil = S.data.billing || {};
+  const iam = S.data.iam || {};
+  const criticalS3 = (s3.vulnerableBuckets || []).filter(b => b.severity === 'critical').length;
+  const iamHigh    = (iam.summary || {}).highSeverity || 0;
+  const vulnPct    = Math.min(100, ((s3.vulnerableCount || 0) / Math.max(1, s3.totalBuckets || 1)) * 100);
+  const iamPct     = Math.min(100, (((iam.summary || {}).usersWithIssues || 0) / Math.max(1, (iam.summary || {}).totalUsers || 1)) * 100);
+  const score      = Math.round(100 - (vulnPct * 0.6) - (iamPct * 0.4));
+  const summary = {
+    securityScore: score, scoreChange: 0,
+    criticalIssues: criticalS3 + iamHigh, criticalChange: 0,
+    monthlyCost: (bil.summary || {}).currentMonthCost, costChange: (bil.summary || {}).percentChange || 0,
+    autoFixes: S.fixHistory.filter(f => f.status === 'success').length
+  };
+  try {
+    await api('POST', '/notify/weekly', { summary });
+    toast('Weekly summary email sent!', 'success');
+  } catch (err) { toast('Email failed: ' + err.message, 'error'); }
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function renderBarChart(id, trend) {
+  const el = document.getElementById(id);
+  if (!trend || !trend.length) { el.innerHTML = '<div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">No data</div>'; return; }
+  const max = Math.max(...trend.map(d => d.cost));
+  el.innerHTML = trend.map(d => {
+    const pct = Math.max(8, (d.cost / max) * 100);
+    return `<div class="bar-wrap"><div class="bar" style="height:${pct}%" data-tip="$${fmt(d.cost)}"></div><div class="bar-lbl">${d.month}</div></div>`;
+  }).join('');
+}
+
+function issueRow(name, desc, sev, showBtn = true) {
+  const pip = { critical:'pip-critical', high:'pip-high', medium:'pip-medium', low:'pip-low', ok:'pip-ok' }[sev] || 'pip-low';
+  const tag = { critical:'tag-critical', high:'tag-high', medium:'tag-medium', low:'tag-low', ok:'tag-ok' }[sev] || 'tag-low';
+  return `<div class="issue-row">
+    <div class="pip ${pip}"></div>
+    <div class="issue-info"><div class="issue-name">${name}</div><div class="issue-desc">${desc}</div></div>
+    <div class="sev-tag ${tag}">${sev.toUpperCase()}</div>
+    ${showBtn ? `<button class="fix-btn" onclick="toast('Queued: ${name} for fix','info')">Fix →</button>` : ''}
+  </div>`;
+}
+
+function issueRowWithFix(name, desc, sev, showBtn = true, fixFn) {
+  const pip = { critical:'pip-critical', high:'pip-high', medium:'pip-medium', low:'pip-low', ok:'pip-ok' }[sev] || 'pip-low';
+  const tag = { critical:'tag-critical', high:'tag-high', medium:'tag-medium', low:'tag-low', ok:'tag-ok' }[sev] || 'tag-low';
+  const fnId = `fix_${Math.random().toString(36).slice(2)}`;
+  if (fixFn) window[fnId] = fixFn;
+  return `<div class="issue-row">
+    <div class="pip ${pip}"></div>
+    <div class="issue-info"><div class="issue-name">${name}</div><div class="issue-desc">${desc}</div></div>
+    <div class="sev-tag ${tag}">${sev.toUpperCase()}</div>
+    ${showBtn && fixFn ? `<button class="fix-btn" onclick="${fnId}()">⚡ Fix</button>` : showBtn ? `<button class="fix-btn" onclick="toast('Use Auto-Fix tab for ${name}','info')">Fix →</button>` : ''}
+  </div>`;
+}
+
+function empty(msg) {
+  return `<div class="empty"><div class="empty-icon">${msg.includes('✅') ? '✅' : '·'}</div><div class="empty-text">${msg}</div></div>`;
+}
+
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+function fmt(n) {
+  if (n == null) return '—';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n.toFixed(0);
+}
+
+// ─── SCAN ─────────────────────────────────────────────────────────────────────
+async function runScan() {
+  const overlay = document.getElementById('scan-overlay');
+  const steps   = document.querySelectorAll('.scan-step');
+  const btn     = document.getElementById('scan-btn');
+  overlay.style.display = 'flex';
+  btn.disabled = true;
+  for (let i = 0; i < steps.length; i++) {
+    if (i > 0) { steps[i-1].classList.remove('active'); steps[i-1].classList.add('done'); steps[i-1].querySelector('.step-icon').textContent = '✓'; }
+    steps[i].classList.add('active');
+    await sleep(700 + Math.random() * 500);
+  }
+  steps[steps.length-1].classList.add('done'); steps[steps.length-1].querySelector('.step-icon').textContent = '✓';
+  await loadAllData();
+  overlay.style.display = 'none';
+  btn.disabled = false;
+  steps.forEach((s,i) => { s.classList.remove('done','active'); s.querySelector('.step-icon').textContent = i===0?'›':'·'; });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── NAV ──────────────────────────────────────────────────────────────────────
+const tabMeta = {
+  overview:      ['Overview',             'Live AWS account dashboard'],
+  security:      ['S3 Security',          'Bucket vulnerability audit'],
+  ec2:           ['EC2 Instances',        'Compute resources & storage'],
+  iam:           ['IAM Permissions',      'User access & policy audit'],
+  billing:       ['Billing & Cost',       'Spend trends & forecasts'],
+  autofix:       ['Auto-Fix Engine',      'Apply fixes directly to your AWS account'],
+  absence:       ['Absence Manager',      '5-day inactivity → auto-stop services'],
+  notifications: ['Email Notifications',  'Alert configuration & SMTP setup'],
+};
+
+function setTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`[onclick*="${name}"]`)?.classList.add('active');
+  const m = tabMeta[name] || ['', ''];
+  setText('page-title', m[0]);
+  setText('page-sub', m[1]);
+  if (name === 'absence') refreshAbsenceStatus();
+  if (name === 'notifications') checkEmailConfig();
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'x-session-id': S.sessionId || '' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + '/api' + path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const icons = { success:'✓', error:'✕', warn:'⚠', info:'i' };
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span>[${icons[type]||'i'}]</span> ${msg}`;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+// ─── PDF REPORT ───────────────────────────────────────────────────────────────
+function downloadReport() {
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) { toast('PDF library not loaded', 'error'); return; }
+  const d = S.data;
+  const s3 = d.s3 || {}; const ec = d.ec2 || {}; const ia = d.iam || {}; const bi = d.billing || {};
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  let y = 0;
+  const ink=[13,13,13],lime=[198,241,53],white=[240,240,235],muted=[100,100,95],red=[255,71,71],amber=[255,181,71],sky=[71,200,255];
+  function newPage(){doc.addPage();y=12;doc.setFillColor(...ink);doc.rect(0,0,W,297,'F');doc.setFillColor(...lime);doc.rect(0,0,W,1.5,'F');}
+  function section(title){if(y>250)newPage();y+=6;doc.setFillColor(30,30,30);doc.rect(10,y,W-20,8,'F');doc.setFillColor(...lime);doc.rect(10,y,2,8,'F');doc.setTextColor(...lime);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(title,15,y+5.5);y+=12;}
+  function row(label,value,valColor){if(y>280)newPage();doc.setTextColor(...muted);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(label,14,y);doc.setTextColor(...(valColor||white));doc.setFont('helvetica','bold');doc.text(String(value??'—'),80,y);y+=6;}
+  function divider(){doc.setDrawColor(42,42,42);doc.setLineWidth(0.2);doc.line(10,y,W-10,y);y+=4;}
+  doc.setFillColor(...ink);doc.rect(0,0,W,297,'F');
+  doc.setFillColor(...lime);doc.rect(0,0,W,1.5,'F');y=14;
+  doc.setFillColor(198,241,53);doc.roundedRect(10,y,14,14,2,2,'F');
+  doc.setTextColor(...ink);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('CG',17,y+9,{align:'center'});
+  doc.setTextColor(...white);doc.setFontSize(16);doc.text('CloudGuard Pro',28,y+7);
+  doc.setTextColor(...muted);doc.setFontSize(7);doc.text('AWS SECURITY & COST REPORT v2.5',28,y+12);y+=20;
+  doc.setTextColor(...muted);doc.setFontSize(7);doc.setFont('helvetica','normal');
+  doc.text(`Account: ${S.accountId||'—'}   Role: ${S.roleName||'—'}   Generated: ${new Date().toLocaleString()}`,10,y);y+=4;divider();
+  section('SECURITY OVERVIEW');
+  const score=parseInt(document.getElementById('ring-num')?.textContent)||0;
+  const scoreColor=score>=80?lime:score>=60?amber:red;
+  row('Security Score',score+' / 100',scoreColor);
+  row('Critical Issues',document.getElementById('m-critical')?.textContent||'—',red);
+  row('Monthly Spend',document.getElementById('m-cost')?.textContent||'—',amber);
+  row('Running Instances',document.getElementById('m-instances')?.textContent||'—',sky);
+  row('Auto-Fixes Applied',S.fixHistory.filter(f=>f.status==='success').length,lime);divider();
+  section('S3 BUCKET SECURITY AUDIT');
+  row('Total Buckets',s3.totalBuckets??'—');row('Vulnerable Buckets',s3.vulnerableCount??'—',amber);row('Critical',s3.criticalCount??'—',red);y+=2;
+  (s3.vulnerableBuckets||[]).slice(0,8).forEach(b=>{if(y>275)newPage();const c={critical:red,high:amber,medium:sky,low:muted}[b.severity]||muted;doc.setFillColor(25,25,25);doc.rect(14,y-3,W-28,7,'F');doc.setTextColor(...c);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text(`[${(b.severity||'').toUpperCase()}]`,16,y+1);doc.setTextColor(...white);doc.setFont('helvetica','normal');doc.text(b.name||'—',36,y+1);doc.setTextColor(...muted);doc.setFontSize(6.5);doc.text((b.issues||[]).join(' · ').substring(0,70),16,y+5.5);y+=10;});divider();
+  section('EC2 COMPUTE');
+  row('Running Instances',(ec.summary||{}).runningInstances??'—',lime);row('Stopped Instances',(ec.summary||{}).stoppedInstances??'—');row('Idle (7d+)',(ec.summary||{}).idleInstances??'—',amber);row('Monthly Cost Est.','$'+fmt((ec.summary||{}).estimatedMonthlyCost),amber);divider();
+  section('IAM USER AUDIT');
+  row('Total Users',(ia.summary||{}).totalUsers??'—');row('Users with Issues',(ia.summary||{}).usersWithIssues??'—',amber);row('High Severity',(ia.summary||{}).highSeverity??'—',red);row('Without MFA',(ia.summary||{}).usersWithoutMFA??'—',red);divider();
+  section('BILLING & COST ANALYSIS');
+  const bs=(bi.summary||{});
+  row('This Month',bs.currentMonthCost!=null?'$'+fmt(bs.currentMonthCost):'—',lime);row('Forecasted (EOM)',bs.forecastedCost!=null?'$'+fmt(bs.forecastedCost):'—',amber);row('Last Month',bs.previousMonthCost!=null?'$'+fmt(bs.previousMonthCost):'—');
+  const ch=bs.percentChange;row('Month-over-Month',ch!=null?`${ch>0?'+':''}${ch}%`:'—',ch>5?red:ch<0?lime:sky);
+  (bi.serviceBreakdown||[]).slice(0,6).forEach(svc=>{if(y>275)newPage();doc.setTextColor(...muted);doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text(svc.service.replace('Amazon ','').replace('AWS ',''),16,y);doc.setTextColor(...lime);doc.setFont('helvetica','bold');doc.text('$'+svc.cost.toFixed(0),80,y);y+=5.5;});
+  if(S.fixHistory.length){section('AUTO-FIX HISTORY');S.fixHistory.slice(0,10).forEach(f=>{if(y>275)newPage();const c=f.status==='success'?lime:red;doc.setTextColor(...c);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text(f.status==='success'?'[OK]':'[FAIL]',16,y);doc.setTextColor(...white);doc.setFont('helvetica','normal');doc.text((f.resource||'').substring(0,35),30,y);doc.setTextColor(...muted);doc.text(f.action||'',80,y);y+=5.5;});}
+  if(y<270){y=278;doc.setDrawColor(42,42,42);doc.setLineWidth(0.3);doc.line(10,y,W-10,y);y+=4;doc.setTextColor(...muted);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text(`CloudGuard Pro v2.5.0 · ${new Date().toISOString()}`,W/2,y,{align:'center'});}
+  doc.save(`cloudguard-${S.accountId}-${new Date().toISOString().split('T')[0]}.pdf`);
+  toast('PDF report downloaded', 'success');
+}
+</script>
+</body>
+</html>

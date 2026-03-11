@@ -9,7 +9,8 @@ const iamService     = require('../services/iam');
 const billingService = require('../services/billing');
 const emailSvc       = require('../services/email');
 const absence        = require('../services/absence');
-
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const router = express.Router();
 
 const COST_ALERT_THRESHOLD = parseFloat(process.env.COST_ALERT_THRESHOLD || '500');
@@ -74,7 +75,20 @@ async function triggerAlerts(session, overview) {
     console.error('[aws] Alert trigger error:', err.message);
   }
 }
-
+router.post('/ai/chat', async (req, res) => {
+  const { model, max_tokens, system, messages } = req.body;
+  try {
+    const msg = await anthropic.messages.create({
+      model:      model || 'claude-sonnet-4-20250514',
+      max_tokens: max_tokens || 1000,
+      system,
+      messages,
+    });
+    res.json(msg);
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
 // ── GET /api/aws/overview ─────────────────────────────────────────────────────
 router.get('/overview', requireSession, async (req, res) => {
   const { awsCredentials: creds, awsRegion: region, session } = req;

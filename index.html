@@ -356,6 +356,95 @@ body.light .scan-step.done { color: var(--lime); }
 
 @media(max-width:1100px){.metrics-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}.email-config-grid,.absence-grid,.plan-form-grid{grid-template-columns:1fr}}
 @media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+
+/* ════ AI ASSISTANT STYLES ════ */
+
+/* ── Floating chat bubble ──────────────────────────────────────────── */
+.ai-fab{position:fixed;bottom:1.75rem;right:1.75rem;z-index:2000;display:flex;flex-direction:column;align-items:flex-end;gap:.6rem}
+.ai-fab-btn{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--lime),#8ecf00);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.35rem;box-shadow:0 4px 20px rgba(198,241,53,.35);transition:all .2s;position:relative}
+.ai-fab-btn:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(198,241,53,.5)}
+.ai-fab-btn.has-unread::after{content:'';position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--red);border-radius:50%;border:2px solid var(--ink);animation:pulse 1.5s infinite}
+.ai-fab-tooltip{background:var(--ink-2);border:1px solid var(--border-hi);border-radius:7px;padding:.35rem .75rem;font-family:var(--font-mono);font-size:.65rem;color:var(--white);white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s}
+.ai-fab-btn:hover + .ai-fab-tooltip,.ai-fab-btn:focus + .ai-fab-tooltip{opacity:1}
+
+/* ── Chat panel (floating) ─────────────────────────────────────────── */
+.ai-chat-panel{position:fixed;bottom:5.5rem;right:1.75rem;z-index:1999;width:380px;max-height:560px;background:var(--ink-2);border:1px solid var(--border-hi);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.55);transition:all .25s cubic-bezier(.34,1.56,.64,1);transform-origin:bottom right}
+.ai-chat-panel.hidden{opacity:0;pointer-events:none;transform:scale(.92) translateY(12px)}
+.ai-chat-panel.visible{opacity:1;pointer-events:all;transform:scale(1) translateY(0)}
+.ai-panel-head{padding:.875rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.65rem;background:var(--ink-3);flex-shrink:0}
+.ai-panel-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--lime),#8ecf00);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+.ai-panel-title{font-family:var(--font-head);font-size:.82rem;font-weight:700}
+.ai-panel-sub{font-family:var(--font-mono);font-size:.58rem;color:var(--muted);margin-top:.05rem}
+.ai-panel-actions{margin-left:auto;display:flex;gap:.35rem}
+.ai-panel-icon-btn{width:26px;height:26px;background:transparent;border:1px solid var(--border);border-radius:5px;cursor:pointer;display:grid;place-items:center;font-size:.75rem;color:var(--muted-hi);transition:all .12s}
+.ai-panel-icon-btn:hover{border-color:var(--lime);color:var(--lime)}
+
+/* ── Message list ─────────────────────────────────────────────────── */
+.ai-messages{flex:1;overflow-y:auto;padding:.875rem;display:flex;flex-direction:column;gap:.65rem;scroll-behavior:smooth}
+.ai-messages::-webkit-scrollbar{width:4px}
+.ai-messages::-webkit-scrollbar-track{background:transparent}
+.ai-messages::-webkit-scrollbar-thumb{background:var(--ink-4);border-radius:4px}
+.ai-msg{display:flex;flex-direction:column;max-width:88%;gap:.2rem}
+.ai-msg.user{align-self:flex-end;align-items:flex-end}
+.ai-msg.assistant{align-self:flex-start;align-items:flex-start}
+.ai-msg-bubble{padding:.6rem .875rem;border-radius:12px;font-size:.8rem;line-height:1.55;word-break:break-word}
+.ai-msg.user .ai-msg-bubble{background:var(--lime);color:var(--ink);border-radius:12px 12px 2px 12px;font-weight:500}
+.ai-msg.assistant .ai-msg-bubble{background:var(--ink-3);border:1px solid var(--border);border-radius:12px 12px 12px 2px;color:var(--white)}
+.ai-msg.assistant .ai-msg-bubble pre{background:var(--ink-4);border:1px solid var(--border);border-radius:6px;padding:.5rem .7rem;font-family:var(--font-mono);font-size:.7rem;margin:.4rem 0;overflow-x:auto;white-space:pre-wrap}
+.ai-msg.assistant .ai-msg-bubble code{font-family:var(--font-mono);font-size:.72rem;background:var(--ink-4);padding:.1rem .3rem;border-radius:3px}
+.ai-msg-time{font-family:var(--font-mono);font-size:.56rem;color:var(--muted);padding:0 .2rem}
+.ai-typing{display:flex;gap:4px;align-items:center;padding:.6rem .875rem;background:var(--ink-3);border:1px solid var(--border);border-radius:12px 12px 12px 2px;width:fit-content}
+.ai-typing span{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:aiDot 1.2s infinite both}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes aiDot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+/* ── Quick prompts ───────────────────────────────────────────────── */
+.ai-quick-prompts{padding:.5rem .875rem;display:flex;flex-wrap:wrap;gap:.35rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.ai-qp{padding:.25rem .6rem;background:var(--ink-3);border:1px solid var(--border);border-radius:20px;font-family:var(--font-mono);font-size:.62rem;color:var(--muted-hi);cursor:pointer;transition:all .12s;white-space:nowrap}
+.ai-qp:hover{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+
+/* ── Input bar ───────────────────────────────────────────────────── */
+.ai-input-bar{padding:.75rem .875rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-shrink:0;background:var(--ink-3)}
+.ai-input{flex:1;padding:.55rem .8rem;background:var(--ink-4);border:1px solid var(--border-hi);border-radius:8px;color:var(--white);font-family:var(--font-body);font-size:.8rem;outline:none;resize:none;transition:border-color .15s;line-height:1.4;max-height:100px;overflow-y:auto}
+.ai-input:focus{border-color:var(--lime)}
+.ai-send-btn{width:34px;height:34px;background:var(--lime);border:none;border-radius:8px;cursor:pointer;display:grid;place-items:center;font-size:1rem;color:var(--ink);transition:all .15s;flex-shrink:0;align-self:flex-end}
+.ai-send-btn:hover{box-shadow:0 3px 12px rgba(198,241,53,.4)}
+.ai-send-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Tab version (full-width) ─────────────────────────────────────── */
+.ai-tab-layout{display:grid;grid-template-columns:1fr 280px;gap:1.25rem;height:calc(100vh - 200px);min-height:500px}
+.ai-tab-chat{background:var(--ink-2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.ai-tab-messages{flex:1;overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;scroll-behavior:smooth}
+.ai-tab-messages::-webkit-scrollbar{width:4px}
+.ai-tab-messages::-webkit-scrollbar-thumb{background:var(--ink-4);border-radius:4px}
+.ai-tab-input-bar{padding:1rem;border-top:1px solid var(--border);display:flex;gap:.6rem;flex-shrink:0;background:var(--ink-3)}
+.ai-tab-input{flex:1;padding:.65rem .9rem;background:var(--ink-4);border:1px solid var(--border-hi);border-radius:8px;color:var(--white);font-family:var(--font-body);font-size:.83rem;outline:none;resize:none;line-height:1.45;transition:border-color .15s;max-height:120px;overflow-y:auto}
+.ai-tab-input:focus{border-color:var(--lime)}
+.ai-tab-send-btn{padding:.65rem 1.25rem;background:var(--lime);border:none;border-radius:8px;cursor:pointer;font-family:var(--font-head);font-weight:700;font-size:.8rem;color:var(--ink);transition:all .15s;align-self:flex-end;white-space:nowrap}
+.ai-tab-send-btn:hover{box-shadow:0 3px 14px rgba(198,241,53,.35)}
+.ai-tab-send-btn:disabled{opacity:.35;cursor:not-allowed}
+.ai-sidebar-panel{display:flex;flex-direction:column;gap:.875rem}
+.ai-context-card{background:var(--ink-2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.ai-context-header{padding:.75rem 1rem;border-bottom:1px solid var(--border);font-family:var(--font-head);font-size:.78rem;font-weight:700}
+.ai-context-body{padding:.875rem 1rem;font-size:.75rem;color:var(--muted);line-height:1.55}
+.ai-context-row{display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)}
+.ai-context-row:last-child{border-bottom:none}
+.ai-context-key{font-family:var(--font-mono);font-size:.65rem;color:var(--muted)}
+.ai-context-val{font-family:var(--font-mono);font-size:.68rem;font-weight:600}
+.ai-suggested-list{display:flex;flex-direction:column;gap:.35rem;padding:.875rem 1rem}
+.ai-suggested-btn{padding:.5rem .75rem;background:var(--ink-3);border:1px solid var(--border);border-radius:7px;font-size:.73rem;color:var(--muted-hi);cursor:pointer;transition:all .12s;text-align:left;line-height:1.4}
+.ai-suggested-btn:hover{border-color:var(--lime);color:var(--white);background:var(--lime-dim)}
+.ai-clear-btn{width:100%;padding:.45rem;background:transparent;border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);font-size:.65rem;color:var(--muted);cursor:pointer;transition:all .12s;margin-top:.25rem}
+.ai-clear-btn:hover{border-color:var(--red);color:var(--red)}
+body.light .ai-msg.assistant .ai-msg-bubble{background:#f0f0f0;border-color:#ddd;color:#111}
+body.light .ai-msg.assistant .ai-msg-bubble pre{background:#e4e4e4;border-color:#ccc}
+body.light .ai-chat-panel{background:#fff;border-color:#ddd}
+body.light .ai-panel-head{background:#f5f5f2}
+body.light .ai-input-bar{background:#f5f5f2}
+body.light .ai-input{background:#e8e8e8;border-color:#ccc;color:#111}
+body.light .ai-tab-input-bar{background:#f5f5f2}
+body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
 </style>
 </head>
 <body>
@@ -444,6 +533,7 @@ body.light .scan-step.done { color: var(--lime); }
       <div class="nav-section">Automation</div>
       <button class="nav-item" onclick="setTab('autofix',this)"><span class="nav-icon">🔧</span> Auto-Fix<span class="nav-badge badge-amber" id="badge-fixes">—</span></button>
       <button class="nav-item" onclick="setTab('absence',this)"><span class="nav-icon">📅</span> Absence Mgr<span class="nav-badge badge-purple" id="badge-absence">OFF</span></button>
+      <button class="nav-item" onclick="setTab('ai',this)"><span class="nav-icon">🤖</span> AI Assistant<span class="nav-badge badge-ok" id="badge-ai">ASK</span></button>
       <div class="nav-section">Alerts</div>
       <button class="nav-item" onclick="setTab('notifications',this)"><span class="nav-icon">🔔</span> Notifications<span class="nav-badge badge-ok" id="badge-notify">—</span></button>
     </nav>
@@ -725,7 +815,64 @@ body.light .scan-step.done { color: var(--lime); }
         </div>
       </div>
 
-      <!-- ═══ NOTIFICATIONS ═══ -->
+      
+      <!-- ═══ AI ASSISTANT ═══ -->
+      <div class="tab-content" id="tab-ai">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+          <div>
+            <div style="font-family:var(--font-head);font-size:1.1rem;font-weight:700">AI Assistant</div>
+            <div style="font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:.2rem">Ask questions about your AWS account · Powered by Claude</div>
+          </div>
+          <span class="ai-badge" style="display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .75rem;background:linear-gradient(135deg,rgba(198,241,53,.15),rgba(71,200,255,.1));border:1px solid rgba(198,241,53,.25);border-radius:20px;font-family:var(--font-mono);font-size:.65rem;color:var(--lime)">◉ CLAUDE ACTIVE</span>
+        </div>
+
+        <div class="ai-tab-layout">
+          <!-- Chat window -->
+          <div class="ai-tab-chat">
+            <div class="ai-tab-messages" id="ai-tab-messages">
+              <!-- Welcome message injected by JS -->
+            </div>
+            <div class="ai-tab-input-bar">
+              <textarea class="ai-tab-input" id="ai-tab-input" placeholder="Ask anything about your AWS account, costs, security, or best practices…" rows="2"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMsg('tab')}"></textarea>
+              <button class="ai-tab-send-btn" id="ai-tab-send" onclick="sendAIMsg('tab')">Send ↑</button>
+            </div>
+          </div>
+
+          <!-- Sidebar: context + suggestions -->
+          <div class="ai-sidebar-panel">
+
+            <!-- Live context injected from AWS data -->
+            <div class="ai-context-card">
+              <div class="ai-context-header">📊 Live AWS Context</div>
+              <div style="padding:.875rem 1rem" id="ai-context-data">
+                <div style="color:var(--muted);font-size:.73rem">Load AWS data first to give the AI full context about your account.</div>
+              </div>
+            </div>
+
+            <!-- Suggested questions -->
+            <div class="ai-context-card">
+              <div class="ai-context-header">💡 Suggested Questions</div>
+              <div class="ai-suggested-list" id="ai-suggested-list">
+                <button class="ai-suggested-btn" onclick="tabAsk('Why are my AWS costs high this month?')">Why are my AWS costs high this month?</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('What are the most critical security issues I should fix first?')">What are my most critical security issues?</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Which EC2 instances are idle and costing me money?')">Which EC2 instances are wasting money?</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('How can I reduce my RDS costs?')">How can I reduce my RDS costs?</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Explain the cost anomalies detected in the last 30 days')">Explain the recent cost anomalies</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('What IAM best practices should I follow?')">What IAM best practices should I follow?</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Give me a 3-step action plan to improve my security score')">Give me a 3-step security action plan</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Should I use Reserved Instances or Spot Instances for my workload?')">Reserved vs Spot Instances — which is better?</button>
+              </div>
+              <button class="ai-clear-btn" onclick="clearAIChat('tab')">🗑 Clear conversation</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+<!-- ═══ NOTIFICATIONS ═══ -->
       <div class="tab-content" id="tab-notifications">
 
         <!-- Email config status -->
@@ -971,6 +1118,7 @@ function showStep(id) {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'grid';
+  const fab = document.getElementById('ai-fab'); if(fab) fab.style.display='flex';
   document.getElementById('sb-account').textContent = S.accountId || '—';
   document.getElementById('sb-role').textContent    = S.roleName  || '—';
 }
@@ -994,6 +1142,8 @@ async function loadAllData() {
     S.data.billing = overview.billing;
     renderAll();
     buildFixQueue();
+    updateAIContextPanel();
+    updateAISuggestions();
     document.getElementById('last-scan').textContent = 'Last scan: ' + new Date().toLocaleTimeString();
     document.getElementById('status-label').textContent = 'LIVE DATA';
     toast('AWS data loaded', 'success');
@@ -1533,6 +1683,385 @@ function fmt(n) {
   return n.toFixed(0);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI ASSISTANT ENGINE — Claude (Anthropic API) integration
+// Features: context-aware, live AWS data injection, conversation memory,
+//           floating chat + sidebar tab, quick prompts, suggested questions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const AI_STATE = {
+  fabMessages:  [],   // floating panel conversation
+  tabMessages:  [],   // sidebar tab conversation
+  streaming:    false,
+  panelOpen:    false,
+  unread:       false,
+};
+
+// ── System prompt: CloudGuard AI persona ──────────────────────────────────────
+function buildSystemPrompt() {
+  const now   = new Date().toLocaleString();
+  const acct  = S.accountId  || 'unknown';
+  const role  = S.roleName   || 'unknown';
+
+  // Gather live AWS context
+  const bil = S.data?.billing?.summary || {};
+  const s3  = S.data?.s3  || {};
+  const ec2 = S.data?.ec2?.summary || {};
+  const iam = S.data?.iam?.summary || {};
+
+  const costCtx = bil.currentMonthCost != null
+    ? `Current month spend: $${bil.currentMonthCost}, forecasted EOM: $${bil.forecastedCost ?? 'N/A'}, MoM change: ${bil.percentChange ?? 'N/A'}%`
+    : 'Billing data not yet loaded.';
+
+  const s3Ctx = s3.totalBuckets != null
+    ? `S3: ${s3.totalBuckets} buckets total, ${s3.vulnerableCount ?? 0} with security issues, ${s3.criticalCount ?? 0} critical`
+    : 'S3 data not yet loaded.';
+
+  const ec2Ctx = ec2.runningInstances != null
+    ? `EC2: ${ec2.runningInstances} running, ${ec2.stoppedInstances ?? 0} stopped, ${ec2.idleInstances ?? 0} idle (7d+), ~$${ec2.estimatedMonthlyCost ?? '?'}/mo`
+    : 'EC2 data not yet loaded.';
+
+  const iamCtx = iam.totalUsers != null
+    ? `IAM: ${iam.totalUsers} users, ${iam.usersWithIssues ?? 0} with issues, ${iam.usersWithoutMFA ?? 0} without MFA, ${iam.highSeverity ?? 0} high severity`
+    : 'IAM data not yet loaded.';
+
+  // Top services
+  const svcs = (S.data?.billing?.serviceBreakdown || []).slice(0, 5);
+  const svcsCtx = svcs.length
+    ? 'Top services by cost: ' + svcs.map(s => `${s.service.replace('Amazon ','').replace('AWS ','')} $${s.cost.toFixed(0)}`).join(', ')
+    : 'Service breakdown not loaded.';
+
+  // Top security issues
+  const secIssues = (S.data?.s3?.vulnerableBuckets || []).slice(0, 3)
+    .map(b => `${b.name} [${b.severity}]: ${(b.issues||[]).join(', ')}`).join(' | ');
+
+  // IAM issues
+  const iamIssues = (S.data?.iam?.usersWithIssues || []).slice(0, 3)
+    .map(u => `${u.username} [${u.severity}]: ${(u.issues||[]).join(', ')}`).join(' | ');
+
+  // Fix history
+  const fixes = (S.fixHistory || []).slice(0, 5)
+    .map(f => `${f.status==='success'?'✓':'✗'} ${f.resource} — ${f.action||f.fixId}`).join(' | ');
+
+  return `You are CloudGuard AI, an expert AWS cloud assistant embedded in the CloudGuard Pro dashboard.
+
+ACCOUNT CONTEXT (live data as of ${now}):
+- AWS Account: ${acct}  |  Role: ${role}
+
+BILLING:
+${costCtx}
+${svcsCtx}
+
+SECURITY:
+${s3Ctx}
+${ec2Ctx}
+${iamCtx}
+${secIssues ? 'S3 vulnerabilities: ' + secIssues : ''}
+${iamIssues ? 'IAM issues: ' + iamIssues : ''}
+
+AUTO-FIX HISTORY:
+${fixes || 'No fixes applied this session.'}
+
+YOUR ROLE:
+- Answer questions about this specific AWS account using the data above
+- Give concrete, actionable recommendations (not generic advice)
+- Reference actual numbers from the account data when relevant
+- Format code, CLI commands, and configs in markdown code blocks
+- For security issues, explain risk and remediation steps clearly
+- Be concise but thorough — bullet points for lists, paragraphs for explanations
+- When data is not yet loaded, say so and suggest running a scan
+- You are an expert in AWS, cloud cost optimization, and security best practices
+- Tone: professional, direct, helpful. No fluff.`;
+}
+
+// ── Build messages array for API call ─────────────────────────────────────────
+function buildMessages(history, newUserMsg) {
+  return [
+    ...history.map(m => ({ role: m.role, content: m.content })),
+    { role: 'user', content: newUserMsg },
+  ];
+}
+
+// ── Call Anthropic API (claude.ai passes key automatically) ───────────────────
+async function callClaude(history, userMsg) {
+  const messages = buildMessages(history, userMsg);
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model:      'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system:     buildSystemPrompt(),
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.content?.map(b => b.type === 'text' ? b.text : '').join('') || '(empty response)';
+}
+
+// ── Render a single message bubble ────────────────────────────────────────────
+function renderAIMsgBubble(role, text, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const div  = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'ai-msg-bubble';
+
+  // Simple markdown: bold, code, pre blocks
+  bubble.innerHTML = text
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+      `<pre>${code.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()}</pre>`)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+
+  const time = document.createElement('div');
+  time.className = 'ai-msg-time';
+  time.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+  div.appendChild(bubble);
+  div.appendChild(time);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return bubble;
+}
+
+// ── Typing indicator ──────────────────────────────────────────────────────────
+function showTyping(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return null;
+  const div = document.createElement('div');
+  div.className = 'ai-msg assistant';
+  div.id = 'ai-typing-' + containerId;
+  div.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function hideTyping(containerId) {
+  const el = document.getElementById('ai-typing-' + containerId);
+  if (el) el.remove();
+}
+
+// ── Core send function ────────────────────────────────────────────────────────
+async function sendAIMsg(mode) {
+  const inputId   = mode === 'fab' ? 'ai-fab-input'    : 'ai-tab-input';
+  const msgsId    = mode === 'fab' ? 'ai-fab-messages' : 'ai-tab-messages';
+  const sendId    = mode === 'fab' ? 'ai-fab-send'     : 'ai-tab-send';
+  const history   = mode === 'fab' ? AI_STATE.fabMessages : AI_STATE.tabMessages;
+
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text || AI_STATE.streaming) return;
+
+  // Render user bubble
+  renderAIMsgBubble('user', text, msgsId);
+  history.push({ role: 'user', content: text });
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Disable send
+  AI_STATE.streaming = true;
+  const sendBtn = document.getElementById(sendId);
+  if (sendBtn) sendBtn.disabled = true;
+
+  // Hide quick prompts after first message
+  const qp = document.getElementById('ai-fab-qp');
+  if (qp && mode === 'fab') qp.style.display = 'none';
+
+  // Typing indicator
+  showTyping(msgsId);
+
+  try {
+    const reply = await callClaude(history.slice(0, -1), text);
+
+    hideTyping(msgsId);
+    renderAIMsgBubble('assistant', reply, msgsId);
+    history.push({ role: 'assistant', content: reply });
+
+    // Update status
+    if (mode === 'fab') {
+      setText('ai-fab-status', '● Ready · Claude powered');
+      if (!AI_STATE.panelOpen) {
+        AI_STATE.unread = true;
+        const btn = document.getElementById('ai-fab-btn');
+        if (btn) btn.classList.add('has-unread');
+      }
+    }
+  } catch (err) {
+    hideTyping(msgsId);
+    const errMsg = err.message.includes('401') || err.message.includes('auth')
+      ? 'Authentication error. Make sure you\'re using CloudGuard via claude.ai where the API key is provided automatically.'
+      : err.message.includes('429')
+        ? 'Rate limited — please wait a moment and try again.'
+        : `Error: ${err.message}`;
+    renderAIMsgBubble('assistant', errMsg, msgsId);
+  }
+
+  AI_STATE.streaming = false;
+  if (sendBtn) sendBtn.disabled = false;
+  if (input) input.focus();
+}
+
+// ── Shortcut helpers ──────────────────────────────────────────────────────────
+function fabAsk(q) {
+  const inp = document.getElementById('ai-fab-input');
+  if (inp) { inp.value = q; sendAIMsg('fab'); }
+}
+
+function tabAsk(q) {
+  const inp = document.getElementById('ai-tab-input');
+  if (inp) { inp.value = q; sendAIMsg('tab'); }
+}
+
+// ── Toggle floating panel ─────────────────────────────────────────────────────
+function toggleAIPanel() {
+  const panel = document.getElementById('ai-chat-panel');
+  if (!panel) return;
+  AI_STATE.panelOpen = !AI_STATE.panelOpen;
+  panel.classList.toggle('hidden',  !AI_STATE.panelOpen);
+  panel.classList.toggle('visible',  AI_STATE.panelOpen);
+
+  if (AI_STATE.panelOpen) {
+    // Clear unread
+    AI_STATE.unread = false;
+    const btn = document.getElementById('ai-fab-btn');
+    if (btn) btn.classList.remove('has-unread');
+
+    // Init welcome message if empty
+    const msgs = document.getElementById('ai-fab-messages');
+    if (msgs && !msgs.children.length) {
+      renderAIMsgBubble('assistant',
+        `Hi! I'm CloudGuard AI, powered by Claude.\n\nI have live access to your AWS account data. Ask me anything — costs, security, optimization, or best practices.`,
+        'ai-fab-messages');
+    }
+    setTimeout(() => document.getElementById('ai-fab-input')?.focus(), 200);
+  }
+}
+
+// ── Clear conversation ────────────────────────────────────────────────────────
+function clearAIChat(mode) {
+  const msgsId = mode === 'fab' ? 'ai-fab-messages' : 'ai-tab-messages';
+  const container = document.getElementById(msgsId);
+  if (container) container.innerHTML = '';
+  if (mode === 'fab') {
+    AI_STATE.fabMessages = [];
+    // Re-show quick prompts
+    const qp = document.getElementById('ai-fab-qp');
+    if (qp) qp.style.display = 'flex';
+    renderAIMsgBubble('assistant',
+      'Chat cleared! Ask me anything about your AWS account.',
+      'ai-fab-messages');
+  } else {
+    AI_STATE.tabMessages = [];
+    injectTabWelcome();
+  }
+}
+
+// ── Init AI tab ───────────────────────────────────────────────────────────────
+function initAITab() {
+  updateAIContextPanel();
+  const msgs = document.getElementById('ai-tab-messages');
+  if (msgs && !msgs.children.length) injectTabWelcome();
+  // Update suggestions based on live data
+  updateAISuggestions();
+}
+
+function injectTabWelcome() {
+  const bil  = S.data?.billing?.summary;
+  const ec2  = S.data?.ec2?.summary;
+  const costLine = bil?.currentMonthCost != null
+    ? `Your current spend is **$${bil.currentMonthCost.toFixed(2)}** this month`
+    : 'Run a scan to load your live AWS data';
+
+  renderAIMsgBubble('assistant',
+    `Welcome to CloudGuard AI — I'm your Claude-powered AWS expert.\n\n${costLine}. I can help you with:\n\n- **Cost analysis** — anomalies, forecasts, saving opportunities\n- **Security** — S3, IAM, EC2 vulnerability explanations\n- **Best practices** — architecture, compliance, optimization\n- **Action plans** — step-by-step remediation guides\n\nPick a suggested question on the right, or ask me anything below.`,
+    'ai-tab-messages');
+}
+
+// ── Update context panel with live data ────────────────────────────────────────
+function updateAIContextPanel() {
+  const el = document.getElementById('ai-context-data');
+  if (!el) return;
+
+  const bil = S.data?.billing?.summary;
+  const ec2 = S.data?.ec2?.summary;
+  const s3  = S.data?.s3;
+  const iam = S.data?.iam?.summary;
+
+  if (!bil && !ec2 && !s3) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.73rem">Run a scan to give the AI full context about your account.</div>';
+    return;
+  }
+
+  const rows = [];
+  if (bil?.currentMonthCost != null) rows.push(['This Month', `$${bil.currentMonthCost.toFixed(2)}`, bil.percentChange > 5 ? 'var(--red)' : 'var(--lime)']);
+  if (bil?.forecastedCost != null)   rows.push(['Forecasted', `$${bil.forecastedCost.toFixed(2)}`, 'var(--amber)']);
+  if (ec2?.runningInstances != null) rows.push(['EC2 Running', ec2.runningInstances, 'var(--sky)']);
+  if (ec2?.idleInstances != null)    rows.push(['EC2 Idle', ec2.idleInstances, ec2.idleInstances > 0 ? 'var(--amber)' : 'var(--lime)']);
+  if (s3?.vulnerableCount != null)   rows.push(['S3 Issues', s3.vulnerableCount, s3.vulnerableCount > 0 ? 'var(--red)' : 'var(--lime)']);
+  if (iam?.usersWithIssues != null)  rows.push(['IAM Issues', iam.usersWithIssues, iam.usersWithIssues > 0 ? 'var(--amber)' : 'var(--lime)']);
+
+  el.innerHTML = rows.map(([k, v, col]) =>
+    `<div class="ai-context-row"><span class="ai-context-key">${k}</span><span class="ai-context-val" style="color:${col}">${v}</span></div>`
+  ).join('') + `<div style="font-family:var(--font-mono);font-size:.58rem;color:var(--muted);margin-top:.5rem">↑ Injected into AI context</div>`;
+}
+
+// ── Update suggestions based on live data ────────────────────────────────────
+function updateAISuggestions() {
+  const list = document.getElementById('ai-suggested-list');
+  if (!list) return;
+
+  const suggestions = ['Why are my AWS costs high this month?', 'What are my most critical security issues?'];
+
+  const ec2 = S.data?.ec2?.summary;
+  if (ec2?.idleInstances > 0) suggestions.push(`I have ${ec2.idleInstances} idle EC2 instances — what should I do?`);
+
+  const s3 = S.data?.s3;
+  if (s3?.criticalCount > 0) suggestions.push(`Explain the ${s3.criticalCount} critical S3 bucket issue(s) and how to fix them`);
+
+  const bil = S.data?.billing?.summary;
+  if (bil?.percentChange > 10) suggestions.push(`My costs increased ${bil.percentChange}% — what's causing it?`);
+  if (bil?.forecastedCost > 500) suggestions.push(`My forecast is $${bil.forecastedCost?.toFixed(0)} — how do I reduce it?`);
+
+  suggestions.push(
+    'What Reserved Instance strategy should I use?',
+    'Give me a 5-point security hardening plan for my AWS account',
+    'Explain the shared responsibility model in AWS',
+    'How do I set up AWS Cost Anomaly Detection?'
+  );
+
+  list.innerHTML = suggestions.slice(0, 8).map(q =>
+    `<button class="ai-suggested-btn" onclick="tabAsk('${q.replace(/'/g, "\\'")}')">${q}</button>`
+  ).join('') +
+    '<button class="ai-clear-btn" onclick="clearAIChat(\'tab\')">🗑 Clear conversation</button>';
+}
+
+// ── Auto-resize textarea ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  ['ai-fab-input','ai-tab-input'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    });
+  });
+});
+
+
 // ─── SCAN ─────────────────────────────────────────────────────────────────────
 async function runScan() {
   const overlay = document.getElementById('scan-overlay');
@@ -1564,6 +2093,7 @@ const tabMeta = {
   autofix:       ['Auto-Fix Engine',      'Apply fixes directly to your AWS account'],
   absence:       ['Absence Manager',      '5-day inactivity → auto-stop services'],
   notifications: ['Email Notifications',  'Alert configuration & SMTP setup'],
+  ai:            ['AI Assistant',          'Ask questions about your AWS account — Claude powered'],
 };
 
 function setTab(name, btn) {
@@ -1577,6 +2107,7 @@ function setTab(name, btn) {
   setText('page-sub', m[1]);
   if (name === 'absence') refreshAbsenceStatus();
   if (name === 'notifications') checkEmailConfig();
+  if (name === 'ai') { initAITab(); }
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -1649,5 +2180,37 @@ function downloadReport() {
   toast('PDF report downloaded', 'success');
 }
 </script>
+
+<!-- ════════ AI FLOATING CHAT ════════ -->
+<div class="ai-fab" id="ai-fab" style="display:none">
+  <div class="ai-chat-panel hidden" id="ai-chat-panel">
+    <div class="ai-panel-head">
+      <div class="ai-panel-avatar">🤖</div>
+      <div>
+        <div class="ai-panel-title">CloudGuard AI</div>
+        <div class="ai-panel-sub" id="ai-fab-status">● Ready · Claude powered</div>
+      </div>
+      <div class="ai-panel-actions">
+        <button class="ai-panel-icon-btn" onclick="clearAIChat('fab')" title="Clear chat">✕</button>
+        <button class="ai-panel-icon-btn" onclick="toggleAIPanel()" title="Minimise">−</button>
+      </div>
+    </div>
+    <div class="ai-quick-prompts" id="ai-fab-qp">
+      <span class="ai-qp" onclick="fabAsk('Why are my AWS costs high?')">💸 High costs?</span>
+      <span class="ai-qp" onclick="fabAsk('Summarise my security issues')">🔒 Security summary</span>
+      <span class="ai-qp" onclick="fabAsk('Which EC2 instances should I stop?')">🖥️ Idle EC2?</span>
+      <span class="ai-qp" onclick="fabAsk('What are the top cost saving actions I can take?')">💡 Save money</span>
+    </div>
+    <div class="ai-messages" id="ai-fab-messages"></div>
+    <div class="ai-input-bar">
+      <textarea class="ai-input" id="ai-fab-input" placeholder="Ask about your AWS account…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMsg('fab')}"></textarea>
+      <button class="ai-send-btn" id="ai-fab-send" onclick="sendAIMsg('fab')">↑</button>
+    </div>
+  </div>
+  <button class="ai-fab-btn" id="ai-fab-btn" onclick="toggleAIPanel()" title="Ask CloudGuard AI">🤖</button>
+  <div class="ai-fab-tooltip">Ask CloudGuard AI</div>
+</div>
+
 </body>
 </html>

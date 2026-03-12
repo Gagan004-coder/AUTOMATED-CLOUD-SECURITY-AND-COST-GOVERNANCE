@@ -220,3 +220,4 @@ router.post('/absence/stop-services', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.applyFixFn = applyFix;

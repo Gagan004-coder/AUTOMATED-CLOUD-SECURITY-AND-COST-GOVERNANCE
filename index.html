@@ -855,14 +855,16 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
             <div class="ai-context-card">
               <div class="ai-context-header">💡 Suggested Questions</div>
               <div class="ai-suggested-list" id="ai-suggested-list">
-                <button class="ai-suggested-btn" onclick="tabAsk('Why are my AWS costs high this month?')">Why are my AWS costs high this month?</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('What are the most critical security issues I should fix first?')">What are my most critical security issues?</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('Which EC2 instances are idle and costing me money?')">Which EC2 instances are wasting money?</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('How can I reduce my RDS costs?')">How can I reduce my RDS costs?</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('Explain the cost anomalies detected in the last 30 days')">Explain the recent cost anomalies</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('What IAM best practices should I follow?')">What IAM best practices should I follow?</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('Give me a 3-step action plan to improve my security score')">Give me a 3-step security action plan</button>
-                <button class="ai-suggested-btn" onclick="tabAsk('Should I use Reserved Instances or Spot Instances for my workload?')">Reserved vs Spot Instances — which is better?</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Send me a security alert email with all current issues')">📧 Email security alert</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Send a weekly summary email')">📊 Email weekly report</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Send a test email to verify my notification setup')">✉️ Send test email</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Send a cost alert email')">💰 Email cost alert</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('What are my most critical security issues?')">🔒 Critical security issues</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Show my full cost breakdown by AWS service')">💸 Cost by service</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Which EC2 instances are idle and should be stopped?')">🖥️ Find idle EC2</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Block public access on all vulnerable S3 buckets')">🪣 Fix S3 public access</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Create an absence plan for me for 5 days starting tomorrow')">📅 Create absence plan</button>
+                <button class="ai-suggested-btn" onclick="tabAsk('Give me a 5-point action plan to improve my security score')">🎯 Security action plan</button>
               </div>
               <button class="ai-clear-btn" onclick="clearAIChat('tab')">🗑 Clear conversation</button>
             </div>
@@ -1839,28 +1841,37 @@ function buildMessages(history, newUserMsg) {
   ];
 }
 
-// ── Call Claude via CloudGuard backend proxy (secure — key stays server-side) ─
+// ── Call AI via backend proxy ─────────────────────────────────────────────────
 async function callClaude(history, userMsg) {
   const messages = buildMessages(history, userMsg);
 
-  // Build AWS context snapshot to send with request
-  const bil  = S.data?.billing?.summary || {};
-  const s3   = S.data?.s3 || {};
-  const ec2  = S.data?.ec2?.summary || {};
-  const iam  = S.data?.iam?.summary || {};
-  const svcs = (S.data?.billing?.serviceBreakdown || []).slice(0, 5);
-  const secIssues = (S.data?.s3?.vulnerableBuckets || []).slice(0, 3)
-    .map(b => `${b.name}[${b.severity}]:${(b.issues||[]).join(',')}`).join('|');
+  // Full AWS context — the AI uses this for tool calls too
+  const bil  = S.data?.billing?.summary        || {};
+  const s3   = S.data?.s3                      || {};
+  const ec2  = S.data?.ec2?.summary            || {};
+  const iam  = S.data?.iam?.summary            || {};
+  const svcs = (S.data?.billing?.serviceBreakdown || []).slice(0, 10);
+
+  // Build raw issues list for security email tool
+  const rawIssues = [];
+  for (const b of (s3.vulnerableBuckets || [])) {
+    rawIssues.push({ resource: `s3://${b.name}`, severity: b.severity, issues: b.issues || [] });
+  }
+  for (const u of (S.data?.iam?.usersWithIssues || [])) {
+    rawIssues.push({ resource: `iam:${u.username}`, severity: u.severity, issues: u.issues || [] });
+  }
 
   const awsContext = {
-    accountId:      S.accountId,
-    roleName:       S.roleName,
-    billing:        bil,
-    s3:             { totalBuckets: s3.totalBuckets, vulnerableCount: s3.vulnerableCount, criticalCount: s3.criticalCount },
-    ec2:            ec2,
-    iam:            iam,
-    topServices:    svcs.length ? svcs.map(s => `${s.service.replace('Amazon ','').replace('AWS ','')} $${s.cost.toFixed(0)}`).join(', ') : null,
-    securityIssues: secIssues || null,
+    accountId:        S.accountId,
+    roleName:         S.roleName,
+    billing:          bil,
+    s3:               { totalBuckets: s3.totalBuckets, vulnerableCount: s3.vulnerableCount, criticalCount: s3.criticalCount },
+    ec2:              ec2,
+    iam:              iam,
+    topServices:      svcs.length ? svcs.map(s => `${s.service.replace('Amazon ','').replace('AWS ','')} $${s.cost.toFixed(0)}`).join(', ') : null,
+    serviceBreakdown: svcs,
+    rawIssues,
+    fixHistory:       (S.fixHistory || []).slice(-20),
   };
 
   let response;
@@ -2309,10 +2320,12 @@ function downloadReport() {
       </div>
     </div>
     <div class="ai-quick-prompts" id="ai-fab-qp">
-      <span class="ai-qp" onclick="fabAsk('Why are my AWS costs high?')">💸 High costs?</span>
-      <span class="ai-qp" onclick="fabAsk('Summarise my security issues')">🔒 Security summary</span>
-      <span class="ai-qp" onclick="fabAsk('Which EC2 instances should I stop?')">🖥️ Idle EC2?</span>
-      <span class="ai-qp" onclick="fabAsk('What are the top cost saving actions I can take?')">💡 Save money</span>
+      <span class="ai-qp" onclick="fabAsk('Send me a security alert email')">📧 Email security alert</span>
+      <span class="ai-qp" onclick="fabAsk('Send a weekly summary email')">📊 Email weekly report</span>
+      <span class="ai-qp" onclick="fabAsk('What are my top security issues?')">🔒 Security issues</span>
+      <span class="ai-qp" onclick="fabAsk('Show my cost breakdown by service')">💸 Cost breakdown</span>
+      <span class="ai-qp" onclick="fabAsk('Which EC2 instances should I stop to save money?')">🖥️ Idle EC2?</span>
+      <span class="ai-qp" onclick="fabAsk('Send a test email to verify notifications work')">✉️ Test email</span>
     </div>
     <div class="ai-messages" id="ai-fab-messages"></div>
     <div class="ai-input-bar">

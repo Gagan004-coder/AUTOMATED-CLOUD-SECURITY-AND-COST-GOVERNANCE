@@ -822,9 +822,9 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
           <div>
             <div style="font-family:var(--font-head);font-size:1.1rem;font-weight:700">AI Assistant</div>
-            <div style="font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:.2rem">Ask questions about your AWS account · Powered by Claude</div>
+            <div style="font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:.2rem">Ask questions about your AWS account · Powered by Gemini (free)</div>
           </div>
-          <span class="ai-badge" style="display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .75rem;background:linear-gradient(135deg,rgba(198,241,53,.15),rgba(71,200,255,.1));border:1px solid rgba(198,241,53,.25);border-radius:20px;font-family:var(--font-mono);font-size:.65rem;color:var(--lime)">◉ CLAUDE ACTIVE</span>
+          <span class="ai-badge" style="display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .75rem;background:linear-gradient(135deg,rgba(198,241,53,.15),rgba(71,200,255,.1));border:1px solid rgba(198,241,53,.25);border-radius:20px;font-family:var(--font-mono);font-size:.65rem;color:var(--lime)">◉ AI ACTIVE</span>
         </div>
 
         <div class="ai-tab-layout">
@@ -1031,16 +1031,27 @@ function applyTheme(theme) {
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 window.onload = async () => {
   setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString(), 1000);
-  // Set default date for plan form
   document.getElementById('plan-start').value = new Date().toISOString().split('T')[0];
 
   if (S.sessionId && S.accountId) {
     try {
       const r = await api('GET', `/auth/session/${S.sessionId}`);
       if (r.hasCredentials) { showApp(); loadAllData(); checkEmailConfig(); return; }
-    } catch {}
+      // Session exists but no credentials — show login
+    } catch (e) {
+      // 404 = server restarted and lost in-memory session (Render free tier spins down)
+      // Clear stale session and send to login
+      if (e.status === 404 || e.message?.includes('Session not found') || e.message?.includes('not found')) {
+        localStorage.removeItem('cg_session');
+        S.sessionId = null;
+        toast('Session expired (server restarted). Please reconnect.', 'warn');
+      }
+    }
   }
   document.getElementById('login-screen').style.display = 'flex';
+  // Pre-fill SSO URL from env hint
+  const urlInput = document.getElementById('sso-url-input');
+  if (urlInput && !urlInput.value) urlInput.value = 'https://d-9066009340.awsapps.com/start';
 };
 
 // ─── SSO LOGIN ────────────────────────────────────────────────────────────────
@@ -1121,6 +1132,31 @@ function showApp() {
   const fab = document.getElementById('ai-fab'); if(fab) fab.style.display='flex';
   document.getElementById('sb-account').textContent = S.accountId || '—';
   document.getElementById('sb-role').textContent    = S.roleName  || '—';
+
+  // Check AI status and show badge
+  fetch(API + '/api/ai/status', { headers: { 'x-session-id': S.sessionId || '' } })
+    .then(r => r.json())
+    .then(d => {
+      const badge = document.querySelector('.ai-badge');
+      if (badge) {
+        const label = d.configured
+          ? `◉ ${d.provider === 'gemini' ? 'GEMINI FREE' : 'AI ACTIVE'}`
+          : '○ AI NOT CONFIGURED';
+        badge.textContent = label;
+        badge.style.color = d.configured ? 'var(--lime)' : 'var(--amber)';
+      }
+      // Update fab status too
+      const fabStatus = document.getElementById('ai-fab-status');
+      if (fabStatus && d.configured) {
+        fabStatus.textContent = `● Ready · ${d.model}`;
+      }
+    }).catch(() => {});
+
+  // Keep-alive ping every 4 minutes to prevent Render free tier spin-down
+  if (S._keepAliveTimer) clearInterval(S._keepAliveTimer);
+  S._keepAliveTimer = setInterval(() => {
+    fetch(API + '/api/auth/keepalive').catch(() => {});
+  }, 4 * 60 * 1000);
 }
 
 function logout() {
@@ -1146,10 +1182,23 @@ async function loadAllData() {
     updateAISuggestions();
     document.getElementById('last-scan').textContent = 'Last scan: ' + new Date().toLocaleTimeString();
     document.getElementById('status-label').textContent = 'LIVE DATA';
+    document.getElementById('status-label').style.color = 'var(--lime)';
     toast('AWS data loaded', 'success');
   } catch (err) {
-    toast('API error: ' + err.message + ' — is backend running?', 'error');
     document.getElementById('status-label').textContent = 'OFFLINE';
+    document.getElementById('status-label').style.color = 'var(--red)';
+    // If session expired (server restarted), auto-logout and show login
+    if (err.status === 401 || err.message?.includes('Not authenticated') || err.message?.includes('credentials have expired')) {
+      toast('Session expired — please reconnect via AWS SSO', 'warn');
+      setTimeout(() => {
+        localStorage.removeItem('cg_session');
+        S.sessionId = null;
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('main-app').style.display = 'none';
+      }, 2000);
+    } else {
+      toast('API error: ' + err.message, 'error');
+    }
   }
 }
 
@@ -1787,34 +1836,40 @@ async function callClaude(history, userMsg) {
   const messages = buildMessages(history, userMsg);
 
   // Build AWS context snapshot to send with request
-  const bil = S.data?.billing?.summary || {};
-  const s3  = S.data?.s3 || {};
-  const ec2 = S.data?.ec2?.summary || {};
-  const iam = S.data?.iam?.summary || {};
+  const bil  = S.data?.billing?.summary || {};
+  const s3   = S.data?.s3 || {};
+  const ec2  = S.data?.ec2?.summary || {};
+  const iam  = S.data?.iam?.summary || {};
   const svcs = (S.data?.billing?.serviceBreakdown || []).slice(0, 5);
   const secIssues = (S.data?.s3?.vulnerableBuckets || []).slice(0, 3)
     .map(b => `${b.name}[${b.severity}]:${(b.issues||[]).join(',')}`).join('|');
 
   const awsContext = {
-    accountId:     S.accountId,
-    roleName:      S.roleName,
-    billing:       bil,
-    s3:            { totalBuckets: s3.totalBuckets, vulnerableCount: s3.vulnerableCount, criticalCount: s3.criticalCount },
-    ec2:           ec2,
-    iam:           iam,
-    topServices:   svcs.map(s => `${s.service.replace('Amazon ','').replace('AWS ','')} $${s.cost.toFixed(0)}`).join(', '),
-    securityIssues: secIssues,
+    accountId:      S.accountId,
+    roleName:       S.roleName,
+    billing:        bil,
+    s3:             { totalBuckets: s3.totalBuckets, vulnerableCount: s3.vulnerableCount, criticalCount: s3.criticalCount },
+    ec2:            ec2,
+    iam:            iam,
+    topServices:    svcs.length ? svcs.map(s => `${s.service.replace('Amazon ','').replace('AWS ','')} $${s.cost.toFixed(0)}`).join(', ') : null,
+    securityIssues: secIssues || null,
   };
 
-  const response = await fetch(API + '/api/ai/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-session-id': S.sessionId || '' },
-    body: JSON.stringify({ messages, awsContext }),
-  });
+  let response;
+  try {
+    response = await fetch(API + '/api/ai/chat', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'x-session-id': S.sessionId || '' },
+      body:    JSON.stringify({ messages, awsContext }),
+    });
+  } catch (networkErr) {
+    throw new Error('Cannot reach server. Check your connection or wait for Render to wake up.');
+  }
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || `AI error ${response.status}`);
+    const msg = err.error || `Server error (${response.status})`;
+    throw Object.assign(new Error(msg), { status: response.status });
   }
 
   const data = await response.json();
@@ -1908,7 +1963,7 @@ async function sendAIMsg(mode) {
 
     // Update status
     if (mode === 'fab') {
-      setText('ai-fab-status', '● Ready · Claude powered');
+      setText('ai-fab-status', '● Ready · AI powered');
       if (!AI_STATE.panelOpen) {
         AI_STATE.unread = true;
         const btn = document.getElementById('ai-fab-btn');
@@ -1917,11 +1972,18 @@ async function sendAIMsg(mode) {
     }
   } catch (err) {
     hideTyping(msgsId);
-    const errMsg = err.message.includes('AI not configured') || err.message.includes('ANTHROPIC')
-      ? '⚙️ AI not configured. Add ANTHROPIC_API_KEY to your server .env file to enable Claude.'
-      : err.message.includes('429')
-        ? 'Rate limited — please wait a moment and try again.'
-        : `Error: ${err.message}`;
+    let errMsg;
+    if (err.message.includes('AI not configured') || err.status === 503) {
+      errMsg = '⚙️ **AI not configured.**\n\nGet a **free** Gemini API key at:\nhttps://aistudio.google.com/app/apikey\n\nThen add `GEMINI_API_KEY=your_key` to your Render environment variables and redeploy.';
+    } else if (err.message.includes('Cannot reach server') || err.message.includes('Failed to fetch')) {
+      errMsg = '🔌 **Cannot reach server.** The backend may be waking up (Render free tier). Wait 30 seconds and try again.';
+    } else if (err.status === 429 || err.message.includes('429') || err.message.includes('quota')) {
+      errMsg = '⏱️ **Rate limit hit.** Gemini free tier allows 15 requests/minute. Wait a moment and try again.';
+    } else if (err.status === 401 || err.message.includes('Not authenticated')) {
+      errMsg = '🔑 Session expired. Please disconnect and reconnect via AWS SSO.';
+    } else {
+      errMsg = `❌ Error: ${err.message}`;
+    }
     renderAIMsgBubble('assistant', errMsg, msgsId);
   }
 
@@ -2108,7 +2170,7 @@ const tabMeta = {
   autofix:       ['Auto-Fix Engine',      'Apply fixes directly to your AWS account'],
   absence:       ['Absence Manager',      '5-day inactivity → auto-stop services'],
   notifications: ['Email Notifications',  'Alert configuration & SMTP setup'],
-  ai:            ['AI Assistant',          'Ask questions about your AWS account — Claude powered'],
+  ai:            ['AI Assistant',          'Ask questions about your AWS account — AI powered'],
 };
 
 function setTab(name, btn) {
@@ -2132,7 +2194,9 @@ async function api(method, path, body) {
   const res = await fetch(API + '/api' + path, opts);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+    const msg = err.error || res.statusText;
+    // Attach status code to message for upstream handlers
+    throw Object.assign(new Error(msg), { status: res.status, statusText: `${res.status} ${msg}` });
   }
   return res.json();
 }
@@ -2203,7 +2267,7 @@ function downloadReport() {
       <div class="ai-panel-avatar">🤖</div>
       <div>
         <div class="ai-panel-title">CloudGuard AI</div>
-        <div class="ai-panel-sub" id="ai-fab-status">● Ready · Claude powered</div>
+        <div class="ai-panel-sub" id="ai-fab-status">● Ready · AI powered</div>
       </div>
       <div class="ai-panel-actions">
         <button class="ai-panel-icon-btn" onclick="clearAIChat('fab')" title="Clear chat">✕</button>

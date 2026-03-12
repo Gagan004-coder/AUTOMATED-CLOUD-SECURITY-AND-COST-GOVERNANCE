@@ -1,249 +1,227 @@
-const nodemailer = require('nodemailer');
+// services/email.js — CloudGuard Pro Email Service
+// Supports: Resend API (primary), SendGrid, SMTP (nodemailer) fallback
+'use strict';
 
-const USE_RESEND   = !!process.env.RESEND_API_KEY;
-const USE_SENDGRID = !!process.env.SENDGRID_API_KEY;
-const USE_SMTP     = !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+const alertRecipients = () => (process.env.ALERT_EMAIL || '').split(',').map(s => s.trim()).filter(Boolean);
+const appUrl          = process.env.APP_URL || 'https://automated-cloud-security-and-cost.onrender.com';
 
-if (USE_RESEND)        console.log('[email] Provider: Resend');
-else if (USE_SENDGRID) console.log('[email] Provider: SendGrid');
-else if (USE_SMTP)     console.log('[email] Provider: SMTP');
-else                   console.warn('[email] No provider configured — emails DISABLED');
-
-async function sendViaResend({ to, subject, html, text }) {
-  const recipients = Array.isArray(to) ? to : to.split(',').map(s => s.trim());
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: `CloudGuard Pro <${process.env.SENDGRID_FROM || 'onboarding@resend.dev'}>`,
-      to: recipients,
-      subject,
-      html: html || text,
-      text: text || subject,
-    }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(`Resend ${res.status}: ${detail}`);
-  }
-  console.log('[email] Sent via Resend:', subject);
-  return { sent: true, provider: 'resend' };
+// ── Detect which provider is configured ──────────────────────────────────────
+function detectProvider() {
+  if (process.env.RESEND_API_KEY)  return 'resend';
+  if (process.env.SENDGRID_API_KEY) return 'sendgrid';
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) return 'smtp';
+  return null;
 }
 
-async function sendViaSendGrid({ to, subject, html, text }) {
-  const recipients = Array.isArray(to) ? to : to.split(',').map(s => s.trim());
-  const body = {
-    personalizations: [{ to: recipients.map(email => ({ email })) }],
-    from: { email: process.env.SENDGRID_FROM || 'cloudguard@example.com' },
-    subject,
-    content: [
-      { type: 'text/plain', value: text || subject },
-      { type: 'text/html',  value: html  || text || subject },
-    ],
+async function getConfig() {
+  const provider = detectProvider();
+  return {
+    configured:  !!provider,
+    provider:    provider || 'none',
+    alertEmail:  alertRecipients().join(', ') || '(not set)',
+    smtp: process.env.SMTP_USER ? { user: process.env.SMTP_USER } : null,
   };
-  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(`SendGrid ${res.status}: ${detail}`);
+}
+
+// ── Low-level send function ───────────────────────────────────────────────────
+async function sendEmail({ to, subject, html }) {
+  const provider = detectProvider();
+  if (!provider) throw new Error('No email provider configured. Set RESEND_API_KEY or SMTP_USER+SMTP_PASS in your .env file.');
+
+  const toAddresses = Array.isArray(to) ? to : [to];
+  if (!toAddresses.length) throw new Error('No recipient email address specified');
+
+  if (provider === 'resend') {
+    const from = process.env.SENDGRID_FROM || 'onboarding@resend.dev';
+    const resp = await fetch('https://api.resend.com/emails', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ from, to: toAddresses, subject, html }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.message || `Resend error: ${resp.status}`);
+    return { provider: 'resend', id: data.id };
   }
-  const messageId = res.headers.get('x-message-id') || 'sendgrid-ok';
-  console.log('[email] Sent via SendGrid:', subject, '→', recipients.join(', '), messageId);
-  return { sent: true, messageId, provider: 'sendgrid' };
+
+  if (provider === 'sendgrid') {
+    const resp = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        from: { email: process.env.SENDGRID_FROM || 'noreply@cloudguard.pro' },
+        personalizations: [{ to: toAddresses.map(e => ({ email: e })) }],
+        subject,
+        content: [{ type: 'text/html', value: html }],
+      }),
+    });
+    if (!resp.ok) { const d = await resp.json().catch(() => ({})); throw new Error(d.errors?.[0]?.message || `SendGrid error: ${resp.status}`); }
+    return { provider: 'sendgrid' };
+  }
+
+  if (provider === 'smtp') {
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+    const info = await transporter.sendMail({ from: `CloudGuard Pro <${process.env.SMTP_USER}>`, to: toAddresses.join(','), subject, html });
+    return { provider: 'smtp', messageId: info.messageId };
+  }
 }
 
-let _transporter = null;
-function getTransporter() {
-  if (_transporter) return _transporter;
-  _transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST || 'smtp.gmail.com',
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    connectionTimeout: 10_000,
-    greetingTimeout:   10_000,
-    socketTimeout:     15_000,
-  });
-  return _transporter;
+// ── Email HTML template ────────────────────────────────────────────────────────
+function emailTemplate(title, body, badgeColor = '#c6f135') {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d0d0d;color:#f0f0eb;margin:0;padding:20px}
+  .container{max-width:600px;margin:0 auto;background:#141414;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)}
+  .header{background:#1e1e1e;padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:12px}
+  .logo{width:36px;height:36px;background:${badgeColor};border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#0d0d0d;font-size:14px}
+  .header-title{font-size:18px;font-weight:700;color:#f0f0eb}
+  .header-sub{font-size:11px;color:#666;margin-top:2px}
+  .body{padding:24px}
+  .metric-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .metric-label{font-size:12px;color:#888}
+  .metric-value{font-size:13px;font-weight:600}
+  .issue-item{padding:10px 14px;border-radius:8px;margin-bottom:8px;border:1px solid}
+  .critical{background:rgba(255,71,71,0.1);border-color:rgba(255,71,71,0.2);color:#ff4747}
+  .high{background:rgba(255,181,71,0.1);border-color:rgba(255,181,71,0.2);color:#ffb547}
+  .medium{background:rgba(71,200,255,0.1);border-color:rgba(71,200,255,0.2);color:#47c8ff}
+  .ok{background:rgba(198,241,53,0.1);border-color:rgba(198,241,53,0.2);color:#c6f135}
+  .btn{display:inline-block;padding:10px 20px;background:${badgeColor};color:#0d0d0d;text-decoration:none;border-radius:7px;font-weight:700;font-size:13px;margin-top:16px}
+  .footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,0.05);font-size:11px;color:#555;text-align:center}
+  table{width:100%;border-collapse:collapse}
+</style></head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo">CG</div>
+    <div>
+      <div class="header-title">${title}</div>
+      <div class="header-sub">CloudGuard Pro · ${new Date().toLocaleString()}</div>
+    </div>
+  </div>
+  <div class="body">${body}</div>
+  <div class="footer">
+    <a href="${appUrl}" style="color:#c6f135;text-decoration:none">Open CloudGuard Pro Dashboard →</a><br><br>
+    CloudGuard Pro v2.5.0 · Automated AWS Security &amp; Cost Monitor
+  </div>
+</div>
+</body></html>`;
 }
 
-async function sendViaSmtp({ to, subject, html, text }) {
-  const FROM = process.env.SMTP_FROM || process.env.SMTP_USER;
-  const info = await getTransporter().sendMail({ from: FROM, to, subject, html, text });
-  console.log('[email] Sent via SMTP:', subject, '→', to, info.messageId);
-  return { sent: true, messageId: info.messageId, provider: 'smtp' };
+// ── Individual email types ──────────────────────────────────────────────────
+async function sendTest(to) {
+  const recipients = to ? [to] : alertRecipients();
+  if (!recipients.length) throw new Error('No recipient. Pass a "to" address or set ALERT_EMAIL in .env');
+
+  const html = emailTemplate(
+    '✅ CloudGuard Pro — Test Email',
+    `<h2 style="color:#c6f135;margin-top:0">Email notifications are working!</h2>
+     <p style="color:#aaa">Your CloudGuard Pro alert system is correctly configured and ready to send security, cost, and absence notifications.</p>
+     <div class="metric-row"><span class="metric-label">Provider</span><span class="metric-value" style="color:#c6f135">${detectProvider() || 'none'}</span></div>
+     <div class="metric-row"><span class="metric-label">Recipient</span><span class="metric-value">${recipients.join(', ')}</span></div>
+     <div class="metric-row"><span class="metric-label">Sent at</span><span class="metric-value">${new Date().toLocaleString()}</span></div>
+     <a class="btn" href="${appUrl}">Open Dashboard →</a>`
+  );
+  return sendEmail({ to: recipients, subject: '✅ CloudGuard Pro — Email Test', html });
 }
 
-const TO = process.env.ALERT_EMAIL || '';
-
-async function send({ to, subject, html, text }) {
-  const recipients = to || TO;
-  if (!recipients) return { skipped: true, reason: 'No recipient configured' };
-  if (USE_RESEND)   return sendViaResend({ to: recipients, subject, html, text });
-  if (USE_SENDGRID) return sendViaSendGrid({ to: recipients, subject, html, text });
-  if (USE_SMTP)     return sendViaSmtp({ to: recipients, subject, html, text });
-  console.warn('[email] Skipping — no provider configured:', subject);
-  return { skipped: true, reason: 'No email provider configured' };
-}
-
-// ── Formatted alert emails ────────────────────────────────────────────────────
-
-async function sendSecurityAlert({ accountId, issues, to }) {
+async function sendSecurityAlert(issues, to) {
+  const recipients = to ? [to] : alertRecipients();
   const critical = issues.filter(i => i.severity === 'critical');
   const high     = issues.filter(i => i.severity === 'high');
-  const rows = issues.map(i => `
-    <tr>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:${i.severity==='critical'?'#ff4747':i.severity==='high'?'#ffb547':'#47c8ff'};font-family:monospace;font-size:12px">${i.severity.toUpperCase()}</td>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:#f0f0eb;font-size:13px">${i.resource}</td>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:#aaa;font-size:12px">${(i.issues||[]).join(', ')}</td>
-    </tr>`).join('');
-  return send({
-    to,
-    subject: `🔴 [CloudGuard] Security Alert — ${critical.length} Critical, ${high.length} High · Account ${accountId}`,
-    html: `<div style="background:#0d0d0d;color:#f0f0eb;padding:24px;font-family:sans-serif;max-width:600px">
-      <div style="color:#c6f135;font-size:20px;font-weight:700;margin-bottom:4px">🛡️ CloudGuard Security Alert</div>
-      <div style="color:#555;font-size:12px;font-family:monospace;margin-bottom:20px">Account: ${accountId} · ${new Date().toLocaleString()}</div>
-      <div style="display:flex;gap:12px;margin-bottom:20px">
-        <div style="background:#1e1e1e;border:1px solid rgba(255,71,71,.3);border-radius:8px;padding:12px 20px;text-align:center">
-          <div style="color:#ff4747;font-size:28px;font-weight:700">${critical.length}</div>
-          <div style="color:#aaa;font-size:11px">CRITICAL</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid rgba(255,181,71,.3);border-radius:8px;padding:12px 20px;text-align:center">
-          <div style="color:#ffb547;font-size:28px;font-weight:700">${high.length}</div>
-          <div style="color:#aaa;font-size:11px">HIGH</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid rgba(198,241,53,.2);border-radius:8px;padding:12px 20px;text-align:center">
-          <div style="color:#c6f135;font-size:28px;font-weight:700">${issues.length}</div>
-          <div style="color:#aaa;font-size:11px">TOTAL</div>
-        </div>
-      </div>
-      <table style="width:100%;border-collapse:collapse;background:#141414;border-radius:8px;overflow:hidden">
-        <thead><tr>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">SEV</th>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">RESOURCE</th>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">ISSUES</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div style="margin-top:20px;padding:12px;background:#141414;border-radius:8px;font-size:12px;color:#555">CloudGuard Pro · Automated AWS Security Monitor</div>
-    </div>`,
-    text: `CloudGuard Security Alert\nAccount: ${accountId}\nCritical: ${critical.length} | High: ${high.length} | Total: ${issues.length}\n\n${issues.map(i=>`[${i.severity.toUpperCase()}] ${i.resource}: ${(i.issues||[]).join(', ')}`).join('\n')}`,
-  });
+
+  const issuesHtml = issues.slice(0, 10).map(i => `
+    <div class="issue-item ${i.severity || 'medium'}">
+      <strong>${i.resource}</strong>
+      <div style="font-size:12px;margin-top:4px;opacity:.8">${(i.issues || []).join(' · ')}</div>
+    </div>`).join('');
+
+  const html = emailTemplate(
+    '🔴 CloudGuard — Security Alert',
+    `<h2 style="color:#ff4747;margin-top:0">⚠️ Security Issues Detected</h2>
+     <div class="metric-row"><span class="metric-label">Critical Issues</span><span class="metric-value" style="color:#ff4747">${critical.length}</span></div>
+     <div class="metric-row"><span class="metric-label">High Severity</span><span class="metric-value" style="color:#ffb547">${high.length}</span></div>
+     <div class="metric-row"><span class="metric-label">Total Issues</span><span class="metric-value">${issues.length}</span></div>
+     <h3 style="font-size:13px;color:#aaa;margin:16px 0 8px">Issues Found:</h3>
+     ${issuesHtml}
+     <a class="btn" href="${appUrl}" style="background:#ff4747">View &amp; Fix Issues →</a>`,
+    '#ff4747'
+  );
+  return sendEmail({ to: recipients, subject: `🔴 CloudGuard Alert: ${issues.length} Security Issues Found`, html });
 }
 
-async function sendCostAlert({ accountId, currentCost, forecastedCost, threshold, to }) {
-  return send({
-    to,
-    subject: `💰 [CloudGuard] Cost Alert — $${(currentCost||0).toFixed(2)} spent · Account ${accountId}`,
-    html: `<div style="background:#0d0d0d;color:#f0f0eb;padding:24px;font-family:sans-serif;max-width:600px">
-      <div style="color:#c6f135;font-size:20px;font-weight:700;margin-bottom:4px">💸 CloudGuard Cost Alert</div>
-      <div style="color:#555;font-size:12px;font-family:monospace;margin-bottom:20px">Account: ${accountId} · ${new Date().toLocaleString()}</div>
-      <div style="display:flex;gap:12px;margin-bottom:20px">
-        <div style="background:#1e1e1e;border:1px solid rgba(255,181,71,.3);border-radius:8px;padding:16px 24px;text-align:center">
-          <div style="color:#ffb547;font-size:32px;font-weight:700">$${(currentCost||0).toFixed(2)}</div>
-          <div style="color:#aaa;font-size:11px">THIS MONTH</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid rgba(71,200,255,.2);border-radius:8px;padding:16px 24px;text-align:center">
-          <div style="color:#47c8ff;font-size:32px;font-weight:700">$${(forecastedCost||0).toFixed(2)}</div>
-          <div style="color:#aaa;font-size:11px">FORECASTED</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid rgba(255,71,71,.2);border-radius:8px;padding:16px 24px;text-align:center">
-          <div style="color:#ff4747;font-size:32px;font-weight:700">$${(threshold||0).toFixed(0)}</div>
-          <div style="color:#aaa;font-size:11px">THRESHOLD</div>
-        </div>
-      </div>
-      <div style="margin-top:20px;padding:12px;background:#141414;border-radius:8px;font-size:12px;color:#555">CloudGuard Pro · Automated AWS Cost Monitor</div>
-    </div>`,
-    text: `CloudGuard Cost Alert\nAccount: ${accountId}\nThis Month: $${(currentCost||0).toFixed(2)}\nForecasted: $${(forecastedCost||0).toFixed(2)}\nThreshold: $${(threshold||0).toFixed(0)}`,
-  });
+async function sendCostAlert({ currentCost, forecastedCost, threshold }, to) {
+  const recipients = to ? [to] : alertRecipients();
+  const html = emailTemplate(
+    '💰 CloudGuard — Cost Alert',
+    `<h2 style="color:#ffb547;margin-top:0">💰 Cost Threshold Exceeded</h2>
+     <p style="color:#aaa">Your AWS spend has exceeded the configured alert threshold.</p>
+     <div class="metric-row"><span class="metric-label">Current Month Spend</span><span class="metric-value" style="color:#c6f135">$${(currentCost||0).toFixed(2)}</span></div>
+     <div class="metric-row"><span class="metric-label">Forecasted (EOM)</span><span class="metric-value" style="color:#ffb547">$${(forecastedCost||currentCost||0).toFixed(2)}</span></div>
+     <div class="metric-row"><span class="metric-label">Alert Threshold</span><span class="metric-value" style="color:#ff4747">$${threshold}</span></div>
+     <a class="btn" href="${appUrl}" style="background:#ffb547">Review Costs →</a>`,
+    '#ffb547'
+  );
+  return sendEmail({ to: recipients, subject: `💰 CloudGuard: Monthly spend $${(currentCost||0).toFixed(0)} (Threshold: $${threshold})`, html });
 }
 
-async function sendWeeklySummary({ accountId, summary, to }) {
-  const s = summary || {};
-  const scoreColor = s.securityScore >= 80 ? '#c6f135' : s.securityScore >= 60 ? '#ffb547' : '#ff4747';
-  return send({
-    to,
-    subject: `📊 [CloudGuard] Weekly Summary — Score ${s.securityScore||'—'}/100 · Account ${accountId}`,
-    html: `<div style="background:#0d0d0d;color:#f0f0eb;padding:24px;font-family:sans-serif;max-width:600px">
-      <div style="color:#c6f135;font-size:20px;font-weight:700;margin-bottom:4px">📊 CloudGuard Weekly Summary</div>
-      <div style="color:#555;font-size:12px;font-family:monospace;margin-bottom:20px">Account: ${accountId} · Week ending ${new Date().toLocaleDateString()}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-        <div style="background:#1e1e1e;border:1px solid #282828;border-radius:8px;padding:16px">
-          <div style="color:#aaa;font-size:11px;font-family:monospace;margin-bottom:4px">SECURITY SCORE</div>
-          <div style="color:${scoreColor};font-size:32px;font-weight:700">${s.securityScore||'—'}<span style="font-size:16px;color:#555">/100</span></div>
-          <div style="color:${s.scoreChange>=0?'#c6f135':'#ff4747'};font-size:12px">${s.scoreChange>=0?'+':''}${s.scoreChange||0} vs last week</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid #282828;border-radius:8px;padding:16px">
-          <div style="color:#aaa;font-size:11px;font-family:monospace;margin-bottom:4px">CRITICAL ISSUES</div>
-          <div style="color:#ff4747;font-size:32px;font-weight:700">${s.criticalIssues||0}</div>
-          <div style="color:#555;font-size:12px">${s.criticalChange>=0?'+':''}${s.criticalChange||0} vs last week</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid #282828;border-radius:8px;padding:16px">
-          <div style="color:#aaa;font-size:11px;font-family:monospace;margin-bottom:4px">MONTHLY COST</div>
-          <div style="color:#ffb547;font-size:32px;font-weight:700">$${(s.monthlyCost||0).toFixed(0)}</div>
-          <div style="color:${s.costChange<=0?'#c6f135':'#ff4747'};font-size:12px">${s.costChange>=0?'+':''}${s.costChange||0}% vs last month</div>
-        </div>
-        <div style="background:#1e1e1e;border:1px solid #282828;border-radius:8px;padding:16px">
-          <div style="color:#aaa;font-size:11px;font-family:monospace;margin-bottom:4px">AUTO-FIXES APPLIED</div>
-          <div style="color:#c6f135;font-size:32px;font-weight:700">${s.autoFixes||0}</div>
-          <div style="color:#555;font-size:12px">this week</div>
-        </div>
-      </div>
-      <div style="margin-top:20px;padding:12px;background:#141414;border-radius:8px;font-size:12px;color:#555">CloudGuard Pro · Automated AWS Weekly Digest</div>
-    </div>`,
-    text: `CloudGuard Weekly Summary\nAccount: ${accountId}\nSecurity Score: ${s.securityScore||'—'}/100\nCritical Issues: ${s.criticalIssues||0}\nMonthly Cost: $${(s.monthlyCost||0).toFixed(2)}\nAuto-Fixes: ${s.autoFixes||0}`,
-  });
+async function sendWeeklySummary(summary, to) {
+  const recipients = to ? [to] : alertRecipients();
+  const scoreColor = (summary.securityScore||0) >= 80 ? '#c6f135' : (summary.securityScore||0) >= 60 ? '#ffb547' : '#ff4747';
+  const html = emailTemplate(
+    '📊 CloudGuard — Weekly Summary',
+    `<h2 style="color:#c6f135;margin-top:0">📊 Weekly AWS Report</h2>
+     <div class="metric-row"><span class="metric-label">Security Score</span><span class="metric-value" style="color:${scoreColor}">${summary.securityScore ?? '—'} / 100</span></div>
+     <div class="metric-row"><span class="metric-label">Critical Issues</span><span class="metric-value" style="color:#ff4747">${summary.criticalIssues ?? '—'}</span></div>
+     <div class="metric-row"><span class="metric-label">Monthly Cost</span><span class="metric-value" style="color:#c6f135">$${(summary.monthlyCost||0).toFixed(2)}</span></div>
+     <div class="metric-row"><span class="metric-label">Cost Change (MoM)</span><span class="metric-value" style="color:${(summary.costChange||0)>5?'#ff4747':'#c6f135'}">${summary.costChange>=0?'+':''}${summary.costChange||0}%</span></div>
+     <div class="metric-row"><span class="metric-label">Auto-Fixes Applied</span><span class="metric-value">${summary.autoFixes ?? 0}</span></div>
+     <a class="btn" href="${appUrl}">Open Dashboard →</a>`
+  );
+  return sendEmail({ to: recipients, subject: `📊 CloudGuard Weekly: Score ${summary.securityScore ?? '—'}/100 · $${(summary.monthlyCost||0).toFixed(0)} this month`, html });
 }
 
-async function sendAbsencePlan({ accountId, userId, absencePlan, to }) {
-  const plan = absencePlan || {};
-  const dayRows = (plan.days || []).map(d => `
-    <tr>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:#aaa;font-family:monospace;font-size:12px">Day ${d.day}</td>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:#f0f0eb;font-size:13px">${d.date}</td>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:${d.risk==='critical'?'#ff4747':d.risk==='high'?'#ffb547':'#c6f135'};font-size:12px;font-family:monospace">${d.risk?.toUpperCase()||'LOW'}</td>
-      <td style="padding:8px;border-bottom:1px solid #1e1e1e;color:#aaa;font-size:12px">${(d.actions||[]).join(', ')}</td>
-    </tr>`).join('');
-  return send({
-    to,
-    subject: `📅 [CloudGuard] Absence Plan — ${userId} · ${plan.totalDays||'?'} days · Account ${accountId}`,
-    html: `<div style="background:#0d0d0d;color:#f0f0eb;padding:24px;font-family:sans-serif;max-width:600px">
-      <div style="color:#c6f135;font-size:20px;font-weight:700;margin-bottom:4px">📅 Absence Plan Created</div>
-      <div style="color:#555;font-size:12px;font-family:monospace;margin-bottom:12px">Account: ${accountId} · User: ${userId}</div>
-      <div style="background:#141414;border:1px solid #282828;border-radius:8px;padding:12px;margin-bottom:16px;font-family:monospace;font-size:13px">
-        <div>Duration: <span style="color:#c6f135">${plan.totalDays||'?'} days</span></div>
-        <div>Start: <span style="color:#f0f0eb">${plan.startDate||'—'}</span></div>
-        <div>End: <span style="color:#f0f0eb">${plan.endDate||'—'}</span></div>
-      </div>
-      <table style="width:100%;border-collapse:collapse;background:#141414;border-radius:8px;overflow:hidden">
-        <thead><tr>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">DAY</th>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">DATE</th>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">RISK</th>
-          <th style="padding:10px 8px;text-align:left;color:#555;font-size:11px;font-family:monospace;border-bottom:1px solid #1e1e1e">ACTIONS</th>
-        </tr></thead>
-        <tbody>${dayRows}</tbody>
-      </table>
-      <div style="margin-top:20px;padding:12px;background:#141414;border-radius:8px;font-size:12px;color:#555">CloudGuard Pro · Absence Management System</div>
-    </div>`,
-    text: `CloudGuard Absence Plan\nUser: ${userId}\nAccount: ${accountId}\nDuration: ${plan.totalDays||'?'} days\nStart: ${plan.startDate||'—'}\n\n${(plan.days||[]).map(d=>`Day ${d.day} (${d.date}): ${(d.actions||[]).join(', ')}`).join('\n')}`,
-  });
+async function sendAutoFixReport(results, to) {
+  const recipients = to ? [to] : alertRecipients();
+  if (!recipients.length) return;
+  const succeeded = results.filter(r => r.status === 'success');
+  const failed    = results.filter(r => r.status === 'failed');
+
+  const html = emailTemplate(
+    '🔧 CloudGuard — Auto-Fix Report',
+    `<h2 style="color:#c6f135;margin-top:0">🔧 Auto-Fix Results</h2>
+     <div class="metric-row"><span class="metric-label">Succeeded</span><span class="metric-value" style="color:#c6f135">${succeeded.length}</span></div>
+     <div class="metric-row"><span class="metric-label">Failed</span><span class="metric-value" style="color:#ff4747">${failed.length}</span></div>
+     <h3 style="font-size:13px;color:#aaa;margin:16px 0 8px">Applied Fixes:</h3>
+     ${succeeded.slice(0,10).map(r => `<div class="issue-item ok">✓ <strong>${r.resource}</strong> — ${r.details||r.fixId}</div>`).join('')}
+     ${failed.slice(0,5).map(r => `<div class="issue-item critical">✕ <strong>${r.resource}</strong> — ${r.details||'Failed'}</div>`).join('')}
+     <a class="btn" href="${appUrl}">View Dashboard →</a>`
+  );
+  return sendEmail({ to: recipients, subject: `🔧 CloudGuard Auto-Fix: ${succeeded.length} fixes applied`, html });
 }
 
-// ── Exports ───────────────────────────────────────────────────────────────────
-module.exports = {
-  send,
-  sendSecurityAlert,
-  sendCostAlert,
-  sendWeeklySummary,
-  sendAbsencePlan,
-};
+async function sendAbsencePlanEmail(plan, to) {
+  const recipients = to ? [to] : alertRecipients();
+  if (!recipients.length) return;
+
+  const html = emailTemplate(
+    `📅 Absence Plan — ${plan.userId}`,
+    `<h2 style="color:#a78bfa;margin-top:0">📅 Absence Plan Created</h2>
+     <div class="metric-row"><span class="metric-label">User</span><span class="metric-value">${plan.userId}</span></div>
+     <div class="metric-row"><span class="metric-label">Duration</span><span class="metric-value">${plan.totalDays} days</span></div>
+     <div class="metric-row"><span class="metric-label">Start Date</span><span class="metric-value">${plan.startDate}</span></div>
+     <div class="metric-row"><span class="metric-label">Auto-Stop Threshold</span><span class="metric-value" style="color:#ff4747">Day ${plan.autoStopDay || 5}</span></div>
+     <h3 style="font-size:13px;color:#aaa;margin:16px 0 8px">Schedule:</h3>
+     ${(plan.days||[]).slice(0,7).map(d => `<div class="metric-row"><span class="metric-label">Day ${d.day} — ${d.date}</span><span class="metric-value" style="font-size:11px">${(d.actions||[]).join(', ')}</span></div>`).join('')}
+     <a class="btn" href="${appUrl}" style="background:#a78bfa">View Absence Manager →</a>`,
+    '#a78bfa'
+  );
+  return sendEmail({ to: recipients, subject: `📅 CloudGuard: Absence plan created for ${plan.userId} (${plan.totalDays} days)`, html });
+}
+
+module.exports = { getConfig, sendTest, sendSecurityAlert, sendCostAlert, sendWeeklySummary, sendAutoFixReport, sendAbsencePlanEmail, detectProvider };

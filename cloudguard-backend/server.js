@@ -29,18 +29,24 @@ app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-// Parse once, reuse in both the main middleware and the preflight handler.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 
+// Always allow the app's own Render domain
+const renderDomain = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || '';
+if (renderDomain && !allowedOrigins.includes(renderDomain)) {
+  allowedOrigins.push(renderDomain.replace(/\/$/, ''));
+}
+
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // same-origin / server-to-server
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-    ) return cb(null, true);
+    if (!origin) return cb(null, true); // same-origin / server-to-server / curl
+    // Always allow requests from the same Render hostname
+    if (allowedOrigins.some(o => origin.startsWith(o))) return cb(null, true);
+    // Allow any onrender.com subdomain (covers Render previews too)
+    if (/^https:\/\/[^.]+\.onrender\.com$/.test(origin)) return cb(null, true);
+    // Allow localhost in development
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,

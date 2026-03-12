@@ -171,6 +171,11 @@ router.delete('/session/:sessionId', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// ── Keep-alive ping (prevents Render free tier from spinning down) ───────────
+router.get('/keepalive', (req, res) => {
+  res.json({ status: 'alive', time: new Date().toISOString(), sessions: sessions.size });
+});
+
 // Export sessions so other routes can access credentials
 module.exports = router;
 module.exports.sessions = sessions;

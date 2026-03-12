@@ -970,9 +970,13 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
           </div>
         </div>
 
-        
+      </div><!-- end tab-notifications -->
 
-<!-- Scan overlay -->
+    </main>
+  </div><!-- end .main -->
+</div><!-- end .app -->
+
+<!-- ════════ SCAN OVERLAY — outside all tabs, fixed position ════════ -->
 <div class="scan-overlay" id="scan-overlay">
   <div class="scan-modal">
     <div class="scan-line"></div>
@@ -981,9 +985,9 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
     <div style="font-family:var(--font-mono);font-size:.68rem;color:var(--muted)">Querying your AWS account...</div>
     <div class="scan-steps" id="scan-steps">
       <div class="scan-step active"><span class="step-icon">›</span>S3 bucket security</div>
-      <div class="scan-step"><span class="step-icon">·</span>EC2 instances & volumes</div>
-      <div class="scan-step"><span class="step-icon">·</span>IAM users & policies</div>
-      <div class="scan-step"><span class="step-icon">·</span>Billing & cost data</div>
+      <div class="scan-step"><span class="step-icon">·</span>EC2 instances &amp; volumes</div>
+      <div class="scan-step"><span class="step-icon">·</span>IAM users &amp; policies</div>
+      <div class="scan-step"><span class="step-icon">·</span>Billing &amp; cost data</div>
       <div class="scan-step"><span class="step-icon">·</span>Building fix queue</div>
     </div>
   </div>
@@ -1129,7 +1133,8 @@ function showStep(id) {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'grid';
-  const fab = document.getElementById('ai-fab'); if(fab) fab.style.display='flex';
+  const fab = document.getElementById('ai-fab');
+  if (fab) fab.style.display = 'flex';
   document.getElementById('sb-account').textContent = S.accountId || '—';
   document.getElementById('sb-role').textContent    = S.roleName  || '—';
 
@@ -1162,6 +1167,9 @@ function showApp() {
 function logout() {
   if (!confirm('Disconnect from AWS?')) return;
   if (S.sessionId) fetch(`${API}/api/auth/session/${S.sessionId}`, { method: 'DELETE' }).catch(()=>{});
+  const fab = document.getElementById('ai-fab');
+  if (fab) fab.style.display = 'none';
+  if (S._keepAliveTimer) clearInterval(S._keepAliveTimer);
   localStorage.clear();
   location.reload();
 }
@@ -2144,18 +2152,44 @@ async function runScan() {
   const overlay = document.getElementById('scan-overlay');
   const steps   = document.querySelectorAll('.scan-step');
   const btn     = document.getElementById('scan-btn');
+
+  // Reset steps
+  steps.forEach((s, i) => {
+    s.classList.remove('done', 'active');
+    s.querySelector('.step-icon').textContent = i === 0 ? '›' : '·';
+  });
+
   overlay.style.display = 'flex';
   btn.disabled = true;
-  for (let i = 0; i < steps.length; i++) {
-    if (i > 0) { steps[i-1].classList.remove('active'); steps[i-1].classList.add('done'); steps[i-1].querySelector('.step-icon').textContent = '✓'; }
-    steps[i].classList.add('active');
-    await sleep(700 + Math.random() * 500);
+  btn.textContent = '⟳ Scanning...';
+
+  try {
+    for (let i = 0; i < steps.length; i++) {
+      if (i > 0) {
+        steps[i-1].classList.remove('active');
+        steps[i-1].classList.add('done');
+        steps[i-1].querySelector('.step-icon').textContent = '✓';
+      }
+      steps[i].classList.add('active');
+      await sleep(600 + Math.random() * 400);
+    }
+    steps[steps.length-1].classList.remove('active');
+    steps[steps.length-1].classList.add('done');
+    steps[steps.length-1].querySelector('.step-icon').textContent = '✓';
+
+    await loadAllData();
+  } catch(err) {
+    toast('Scan error: ' + err.message, 'error');
+  } finally {
+    overlay.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '⬡ Full Scan';
+    // Reset steps display
+    steps.forEach((s, i) => {
+      s.classList.remove('done', 'active');
+      s.querySelector('.step-icon').textContent = i === 0 ? '›' : '·';
+    });
   }
-  steps[steps.length-1].classList.add('done'); steps[steps.length-1].querySelector('.step-icon').textContent = '✓';
-  await loadAllData();
-  overlay.style.display = 'none';
-  btn.disabled = false;
-  steps.forEach((s,i) => { s.classList.remove('done','active'); s.querySelector('.step-icon').textContent = i===0?'›':'·'; });
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -2260,14 +2294,14 @@ function downloadReport() {
 }
 </script>
 
-<!-- ════════ AI FLOATING CHAT ════════ -->
+<!-- ════════ AI FLOATING CHAT — always present, shown after login ════════ -->
 <div class="ai-fab" id="ai-fab" style="display:none">
   <div class="ai-chat-panel hidden" id="ai-chat-panel">
     <div class="ai-panel-head">
       <div class="ai-panel-avatar">🤖</div>
       <div>
         <div class="ai-panel-title">CloudGuard AI</div>
-        <div class="ai-panel-sub" id="ai-fab-status">● Ready · AI powered</div>
+        <div class="ai-panel-sub" id="ai-fab-status">● Ready · Groq powered (free)</div>
       </div>
       <div class="ai-panel-actions">
         <button class="ai-panel-icon-btn" onclick="clearAIChat('fab')" title="Clear chat">✕</button>

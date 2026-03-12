@@ -14,6 +14,7 @@ const path      = require('path');
 const authRoutes         = require('./routes/auth');
 const awsRoutes          = require('./routes/aws');
 const notificationRoutes = require('./routes/notifications');
+const aiRoutes           = require('./routes/ai');
 const absence            = require('./services/absence');
 
 const app  = express();
@@ -90,6 +91,7 @@ app.use('/api/absence/plan', (req, res, next) => {
 app.use('/api/auth',   authRoutes);
 app.use('/api/aws',    awsRoutes);
 app.use('/api/notify', notificationRoutes);
+app.use('/api/ai',     aiRoutes);
 
 app.get('/api/health', (_, res) => res.json({
   status:  'ok',

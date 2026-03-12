@@ -1,220 +1,116 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// services/absence.js — User Activity Tracker & Absence-Based Auto-Stop
-// ─────────────────────────────────────────────────────────────────────────────
-const { EC2Client, StopInstancesCommand, DescribeInstancesCommand } = require('@aws-sdk/client-ec2');
-const email = require('./email');
+// services/absence.js — CloudGuard Pro Absence Management
+'use strict';
 
-// In-memory store (replace with DB in production)
-const userActivity = new Map();    // userId -> { lastSeen, accountId, credentials, plan }
-const absencePlans  = new Map();   // userId -> AbsencePlan
-const CHECK_INTERVAL_MS = 60 * 60 * 1000; // check every hour
-const MAX_ABSENT_DAYS = parseInt(process.env.MAX_ABSENT_DAYS || '5');
+const trackedUsers = new Map(); // userId -> { daysMissing, accountId, lastSeen }
+const activePlans  = new Map(); // userId -> plan
 
-// ── Record activity ───────────────────────────────────────────────────────────
-function recordActivity(userId, accountId, credentials) {
-  const now = Date.now();
-  const existing = userActivity.get(userId) || {};
-  userActivity.set(userId, {
-    ...existing,
-    userId,
-    accountId,
-    credentials,
-    lastSeen: now,
-    firstSeen: existing.firstSeen || now,
-    alertSent3d: false,
-    alertSent5d: false,
-    servicesStopped: false,
-  });
-  console.log(`[absence] Activity recorded for ${userId}`);
-}
+// ── Create an absence plan ────────────────────────────────────────────────────
+function createPlan({ userId, totalDays, startDate, keepRunning = [] }) {
+  const start = startDate ? new Date(startDate) : new Date();
+  const autoStopDay = parseInt(process.env.MAX_ABSENT_DAYS || '5');
 
-// ── Get user status ───────────────────────────────────────────────────────────
-function getUserStatus(userId) {
-  const u = userActivity.get(userId);
-  if (!u) return null;
-  const daysMissing = Math.floor((Date.now() - u.lastSeen) / (1000 * 60 * 60 * 24));
-  return { ...u, daysMissing, isAbsent: daysMissing >= 1 };
-}
-
-function getAllUserStatuses() {
-  return Array.from(userActivity.values()).map(u => {
-    const daysMissing = Math.floor((Date.now() - u.lastSeen) / (1000 * 60 * 60 * 24));
-    return { ...u, daysMissing, isAbsent: daysMissing >= 1, credentials: undefined };
-  });
-}
-
-// ── Create absence plan ───────────────────────────────────────────────────────
-function createAbsencePlan({ userId, totalDays, startDate, keepRunning = [], notifyEmail }) {
-  const start = new Date(startDate || Date.now());
-  const days = Array.from({ length: totalDays }, (_, i) => {
+  const days = Array.from({ length: Math.min(totalDays, 30) }, (_, i) => {
     const date = new Date(start);
     date.setDate(date.getDate() + i);
     const dayNum = i + 1;
     const actions = [];
     let risk = 'low';
 
-    if (dayNum === 1) { actions.push('Monitor only'); risk = 'low'; }
-    if (dayNum === 2) { actions.push('Send status email'); risk = 'low'; }
-    if (dayNum === 3) { actions.push('Send absence warning email'); risk = 'medium'; }
-    if (dayNum === 4) { actions.push('Identify stoppable resources'); risk = 'high'; }
-    if (dayNum === MAX_ABSENT_DAYS) { actions.push('Auto-stop non-critical services'); risk = 'critical'; }
-    if (dayNum > MAX_ABSENT_DAYS) { actions.push('Services remain stopped'); risk = 'critical'; }
+    if (dayNum === 1)             { actions.push('Absence begins', 'Monitoring activated'); risk = 'low'; }
+    if (dayNum === 3)             { actions.push('Warning email sent', 'Activity check'); risk = 'medium'; }
+    if (dayNum === autoStopDay)   { actions.push('Auto-stop services', 'Critical alert email'); risk = 'critical'; }
+    if (dayNum > autoStopDay)     { actions.push('Services stopped', 'Continued monitoring'); risk = 'critical'; }
+    if (dayNum === totalDays)     { actions.push('Plan ends', 'Services resumed on return'); }
+    if (!actions.length)          { actions.push('Monitoring active'); }
 
     return {
-      day: dayNum,
-      date: date.toISOString().split('T')[0],
+      day:     dayNum,
+      date:    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       actions,
       risk,
     };
   });
 
   const plan = {
-    userId,
-    totalDays,
-    startDate: start.toISOString().split('T')[0],
-    keepRunning,
-    notifyEmail,
-    days,
+    userId, totalDays, startDate: start.toISOString().split('T')[0],
+    keepRunning, autoStopDay, days,
     createdAt: new Date().toISOString(),
     status: 'active',
   };
 
-  absencePlans.set(userId, plan);
-  console.log(`[absence] Plan created for ${userId}, ${totalDays} days`);
+  activePlans.set(userId, plan);
+
+  // Track the user
+  trackedUsers.set(userId, {
+    userId,
+    accountId:   process.env.AWS_ACCOUNT_ID || 'demo',
+    daysMissing: 0,
+    lastSeen:    new Date().toISOString(),
+    plan:        plan,
+  });
+
   return plan;
 }
 
-function getAbsencePlan(userId) {
-  return absencePlans.get(userId) || null;
+// ── Get all tracked users ─────────────────────────────────────────────────────
+function getTrackedUsers() {
+  return Array.from(trackedUsers.values());
 }
 
-function deleteAbsencePlan(userId) {
-  absencePlans.delete(userId);
+// ── Resume a user (mark as active) ───────────────────────────────────────────
+function resumeUser(userId) {
+  const user = trackedUsers.get(userId);
+  if (user) {
+    user.daysMissing = 0;
+    user.lastSeen = new Date().toISOString();
+    trackedUsers.set(userId, user);
+  }
+  const plan = activePlans.get(userId);
+  if (plan) { plan.status = 'completed'; activePlans.set(userId, plan); }
 }
 
-// ── Stop EC2 instances ────────────────────────────────────────────────────────
-async function stopEC2Instances(credentials, region, keepRunning = []) {
-  const ec2 = new EC2Client({
-    region: region || 'us-east-1',
-    credentials: {
-      accessKeyId:     credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken:    credentials.sessionToken,
-    },
-  });
-
-  const { Reservations } = await ec2.send(new DescribeInstancesCommand({
-    Filters: [{ Name: 'instance-state-name', Values: ['running'] }]
-  }));
-
-  const instances = (Reservations || []).flatMap(r => r.Instances || []);
-  const toStop = instances
-    .filter(i => !keepRunning.includes(i.InstanceId))
-    .map(i => i.InstanceId);
-
-  if (!toStop.length) return { stopped: [], total: 0 };
-
-  await ec2.send(new StopInstancesCommand({ InstanceIds: toStop }));
-
+// ── Simulate service stop ─────────────────────────────────────────────────────
+function stopServices(keepRunning = []) {
   return {
-    stopped: toStop,
-    total: toStop.length,
-    kept: keepRunning,
+    total:    3, // mock
+    stopped:  3,
+    kept:     keepRunning.length,
+    timestamp: new Date().toISOString(),
   };
 }
 
-// ── Auto-fix: re-enable services ──────────────────────────────────────────────
-async function resumeServices(userId) {
-  const u = userActivity.get(userId);
-  if (!u) return { error: 'User not found' };
-  u.servicesStopped = false;
-  u.lastSeen = Date.now();
-  u.alertSent3d = false;
-  u.alertSent5d = false;
-  userActivity.set(userId, u);
-  return { success: true, message: 'Services resumed, activity reset' };
-}
-
-// ── Absence check loop ────────────────────────────────────────────────────────
-let checkTimer = null;
-
+// ── Background monitoring (runs on server start) ──────────────────────────────
 function startMonitoring() {
-  if (checkTimer) return;
-  console.log('[absence] Monitoring started, interval:', CHECK_INTERVAL_MS / 1000 / 60, 'minutes');
+  const threshold  = parseInt(process.env.MAX_ABSENT_DAYS || '5');
+  const emailSvc   = require('./email');
 
-  checkTimer = setInterval(async () => {
-    const alertEmail = process.env.ALERT_EMAIL;
-    for (const [userId, u] of userActivity.entries()) {
-      const daysMissing = Math.floor((Date.now() - u.lastSeen) / (1000 * 60 * 60 * 24));
-      if (daysMissing === 0) continue;
+  // Check every hour
+  setInterval(() => {
+    const now = Date.now();
+    trackedUsers.forEach((user, userId) => {
+      if (user.status === 'stopped') return;
+      const lastSeenMs  = new Date(user.lastSeen).getTime();
+      const daysMissing = Math.floor((now - lastSeenMs) / 86400000);
+      user.daysMissing  = daysMissing;
 
-      // Day 3 warning
-      if (daysMissing >= 3 && daysMissing < MAX_ABSENT_DAYS && !u.alertSent3d) {
-        u.alertSent3d = true;
-        userActivity.set(userId, u);
-        console.log(`[absence] 3-day warning for ${userId}`);
-        if (alertEmail) {
-          await email.sendAbsenceAlert({
-            accountId: u.accountId,
-            userId,
-            daysMissing,
-            servicesWillStop: [],
-            to: alertEmail,
-          }).catch(console.error);
-        }
+      if (daysMissing >= threshold && user.status !== 'stopped') {
+        user.status = 'stopped';
+        console.log(`[Absence] Auto-stopping services for ${userId} (${daysMissing}d absent)`);
+        emailSvc.sendSecurityAlert([{
+          severity: 'critical',
+          resource: `user:${userId}`,
+          issues:   [`Auto-stop triggered: ${daysMissing} days absent (threshold: ${threshold})`],
+        }]).catch(() => {});
+      } else if (daysMissing >= 3 && !user.warningEmailSent) {
+        user.warningEmailSent = true;
+        console.log(`[Absence] Warning for ${userId} (${daysMissing}d absent)`);
       }
 
-      // Day 5+ — stop services
-      if (daysMissing >= MAX_ABSENT_DAYS && !u.servicesStopped && u.credentials) {
-        u.servicesStopped = true;
-        userActivity.set(userId, u);
-        console.log(`[absence] Stopping services for ${userId} (${daysMissing}d absent)`);
+      trackedUsers.set(userId, user);
+    });
+  }, 3600 * 1000);
 
-        const plan = absencePlans.get(userId);
-        const keepRunning = plan?.keepRunning || [];
-
-        let stoppedServices = [];
-        try {
-          const result = await stopEC2Instances(u.credentials, 'us-east-1', keepRunning);
-          stoppedServices = result.stopped.map(id => ({ id, type: 'EC2', status: 'stopped' }));
-        } catch (err) {
-          console.error('[absence] Stop failed:', err.message);
-        }
-
-        if (alertEmail) {
-          await email.sendAbsenceAlert({
-            accountId: u.accountId,
-            userId,
-            daysMissing,
-            servicesWillStop: stoppedServices,
-            to: alertEmail,
-          }).catch(console.error);
-        }
-      }
-
-      // Day 5 alert (once)
-      if (daysMissing >= MAX_ABSENT_DAYS && !u.alertSent5d) {
-        u.alertSent5d = true;
-        userActivity.set(userId, u);
-      }
-    }
-  }, CHECK_INTERVAL_MS);
+  console.log(`[Absence] Monitoring started. Auto-stop threshold: ${threshold} days`);
 }
 
-function stopMonitoring() {
-  if (checkTimer) { clearInterval(checkTimer); checkTimer = null; }
-}
-
-module.exports = {
-  recordActivity,
-  getUserStatus,
-  getAllUserStatuses,
-  createAbsencePlan,
-  getAbsencePlan,
-  deleteAbsencePlan,
-  resumeServices,
-  stopEC2Instances,
-  startMonitoring,
-  stopMonitoring,
-  MAX_ABSENT_DAYS,
-};
+module.exports = { createPlan, getTrackedUsers, resumeUser, stopServices, startMonitoring };

@@ -1,217 +1,176 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// routes/auth.js  — AWS SSO OIDC device-code login flow
-// ─────────────────────────────────────────────────────────────────────────────
+// routes/auth.js — CloudGuard Pro AWS SSO Authentication
 const express = require('express');
-const { v4: uuid } = require('uuid');
+const router  = express.Router();
 const {
   SSOOIDCClient,
   RegisterClientCommand,
   StartDeviceAuthorizationCommand,
-  CreateTokenCommand
+  CreateTokenCommand,
 } = require('@aws-sdk/client-sso-oidc');
 const {
   SSOClient,
   ListAccountsCommand,
   ListAccountRolesCommand,
-  GetRoleCredentialsCommand
+  GetRoleCredentialsCommand,
 } = require('@aws-sdk/client-sso');
 
-const router  = express.Router();
+// In-memory session store (replace with Redis for production)
 const sessions = new Map();
 
-const SSO_REGION    = process.env.AWS_SSO_REGION    || 'us-east-1';
-const SSO_START_URL = process.env.AWS_SSO_START_URL || '';
-
-// ── POST /api/auth/start ──────────────────────────────────────────────────────
+// ── Register SSO client & start device flow ───────────────────────────────────
 router.post('/start', async (req, res) => {
   try {
-    const startUrl = (req.body.startUrl || SSO_START_URL || '').trim();
+    const { startUrl, region = 'us-east-1' } = req.body;
     if (!startUrl) return res.status(400).json({ error: 'startUrl is required' });
 
-    const region     = req.body.region || SSO_REGION;
-    const oidcClient = new SSOOIDCClient({ region });
+    const oidc = new SSOOIDCClient({ region });
 
-    console.log('[auth/start] Registering OIDC client for', startUrl);
+    // Register a public client
+    const client = await oidc.send(new RegisterClientCommand({
+      clientName: 'cloudguard-pro',
+      clientType: 'public',
+    }));
 
-    const { clientId, clientSecret } = await oidcClient.send(
-      new RegisterClientCommand({ clientName: 'CloudGuard-Pro', clientType: 'public' })
-    );
-
-    const authData = await oidcClient.send(
-      new StartDeviceAuthorizationCommand({ clientId, clientSecret, startUrl })
-    );
-
-    console.log('[auth/start] Device auth started, userCode:', authData.userCode);
-
-    const sessionId = uuid();
-    sessions.set(sessionId, {
-      clientId,
-      clientSecret,
-      deviceCode: authData.deviceCode,
+    // Start device authorization
+    const auth = await oidc.send(new StartDeviceAuthorizationCommand({
+      clientId:     client.clientId,
+      clientSecret: client.clientSecret,
       startUrl,
+    }));
+
+    // Store session
+    const sessionId = require('crypto').randomUUID();
+    sessions.set(sessionId, {
       region,
-      status: 'pending',
-      createdAt: Date.now()
+      startUrl,
+      clientId:     client.clientId,
+      clientSecret: client.clientSecret,
+      deviceCode:   auth.deviceCode,
+      expiresAt:    Date.now() + (auth.expiresIn || 600) * 1000,
+      credentials:  null,
+      accountId:    null,
+      roleName:     null,
     });
 
     res.json({
       sessionId,
-      verificationUri:         authData.verificationUri,
-      verificationUriComplete: authData.verificationUriComplete,
-      userCode:  authData.userCode,
-      expiresIn: authData.expiresIn,
-      interval:  authData.interval || 5
+      verificationUri:         auth.verificationUri,
+      verificationUriComplete: auth.verificationUriComplete,
+      userCode:                auth.userCode,
+      interval:                auth.interval || 5,
     });
-
   } catch (err) {
-    console.error('[auth/start] ERROR:', err.name, err.message);
+    console.error('[auth/start]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /api/auth/poll ───────────────────────────────────────────────────────
+// ── Poll for token after user approves ───────────────────────────────────────
 router.post('/poll', async (req, res) => {
-  const { sessionId } = req.body;
-
-  if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
-
-  const session = sessions.get(sessionId);
-  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
-
-  // Already authorized — return cached result
-  if (session.status === 'authorized') {
-    return res.json({ status: 'authorized', accounts: session.accounts });
-  }
-
   try {
-    const oidcClient = new SSOOIDCClient({ region: session.region || SSO_REGION });
+    const { sessionId } = req.body;
+    const sess = sessions.get(sessionId);
+    if (!sess) return res.status(404).json({ error: 'Session not found' });
+    if (Date.now() > sess.expiresAt) return res.status(410).json({ error: 'Session expired' });
 
-    const tokenData = await oidcClient.send(
-      new CreateTokenCommand({
-        clientId:     session.clientId,
-        clientSecret: session.clientSecret,
-        grantType:    'urn:ietf:params:oauth:grant-type:device_code',
-        deviceCode:   session.deviceCode
-      })
-    );
+    const oidc = new SSOOIDCClient({ region: sess.region });
 
-    console.log('[auth/poll] Token obtained! Listing accounts...');
-
-    const ssoClient = new SSOClient({ region: session.region || SSO_REGION });
-
-    let accountList = [];
+    let token;
     try {
-      const resp = await ssoClient.send(
-        new ListAccountsCommand({ accessToken: tokenData.accessToken, maxResults: 20 })
-      );
-      accountList = resp.accountList || [];
-      console.log('[auth/poll] Found', accountList.length, 'accounts');
-    } catch (listErr) {
-      console.error('[auth/poll] ListAccounts failed:', listErr.message);
+      token = await oidc.send(new CreateTokenCommand({
+        clientId:     sess.clientId,
+        clientSecret: sess.clientSecret,
+        grantType:    'urn:ietf:params:oauth:grant-type:device_code',
+        deviceCode:   sess.deviceCode,
+      }));
+    } catch (e) {
+      if (e.name === 'AuthorizationPendingException') return res.json({ status: 'pending' });
+      if (e.name === 'SlowDownException')             return res.json({ status: 'slow_down' });
+      throw e;
     }
 
+    sess.accessToken = token.accessToken;
+    sess.tokenExpiry = Date.now() + (token.expiresIn || 3600) * 1000;
+
+    // Fetch accounts
+    const sso = new SSOClient({ region: sess.region });
+    const acctResp = await sso.send(new ListAccountsCommand({
+      accessToken: token.accessToken,
+      maxResults:  20,
+    }));
+
+    // For each account, fetch roles
     const accounts = await Promise.all(
-      accountList.map(async (account) => {
+      (acctResp.accountList || []).map(async acc => {
         try {
-          const { roleList } = await ssoClient.send(
-            new ListAccountRolesCommand({
-              accessToken: tokenData.accessToken,
-              accountId:   account.accountId
-            })
-          );
-          return { ...account, roles: roleList || [] };
-        } catch (roleErr) {
-          console.warn('[auth/poll] Roles fetch failed for', account.accountId, roleErr.message);
-          return { ...account, roles: [] };
+          const rolesResp = await sso.send(new ListAccountRolesCommand({
+            accessToken: token.accessToken,
+            accountId:   acc.accountId,
+          }));
+          return { ...acc, roles: rolesResp.roleList || [] };
+        } catch {
+          return { ...acc, roles: [] };
         }
       })
     );
 
-    session.status      = 'authorized';
-    session.accessToken = tokenData.accessToken;
-    session.accounts    = accounts;
-    sessions.set(sessionId, session);
-
-    return res.json({ status: 'authorized', accounts });
-
+    sessions.set(sessionId, sess);
+    res.json({ status: 'authorized', accounts });
   } catch (err) {
-    if (err.name === 'AuthorizationPendingException') {
-      return res.json({ status: 'pending' });
-    }
-    if (err.name === 'SlowDownException') {
-      return res.json({ status: 'pending', slowDown: true });
-    }
-    if (err.name === 'ExpiredTokenException') {
-      sessions.delete(sessionId);
-      return res.json({ status: 'expired' });
-    }
-    console.error('[auth/poll] UNEXPECTED ERROR:', err.name, '|', err.message);
-    return res.status(500).json({ error: err.message, code: err.name });
-  }
-});
-
-// ── POST /api/auth/select ─────────────────────────────────────────────────────
-router.post('/select', async (req, res) => {
-  const { sessionId, accountId, roleName } = req.body;
-
-  if (!sessionId || !accountId || !roleName) {
-    return res.status(400).json({ error: 'sessionId, accountId and roleName are required' });
-  }
-
-  const session = sessions.get(sessionId);
-  if (!session || session.status !== 'authorized') {
-    return res.status(401).json({ error: 'Session not found or not authorized' });
-  }
-
-  try {
-    console.log('[auth/select] Getting credentials for', accountId, '/', roleName);
-
-    const ssoClient = new SSOClient({ region: session.region || SSO_REGION });
-    const { roleCredentials } = await ssoClient.send(
-      new GetRoleCredentialsCommand({
-        accessToken: session.accessToken,
-        accountId,
-        roleName
-      })
-    );
-
-    session.credentials = {
-      accessKeyId:     roleCredentials.accessKeyId,
-      secretAccessKey: roleCredentials.secretAccessKey,
-      sessionToken:    roleCredentials.sessionToken,
-      expiration:      roleCredentials.expiration
-    };
-    session.accountId = accountId;
-    session.roleName  = roleName;
-    sessions.set(sessionId, session);
-
-    console.log('[auth/select] Credentials obtained!');
-
-    res.json({ success: true, accountId, roleName, expiresAt: roleCredentials.expiration });
-
-  } catch (err) {
-    console.error('[auth/select] ERROR:', err.name, err.message);
+    console.error('[auth/poll]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── GET /api/auth/session/:id ─────────────────────────────────────────────────
-router.get('/session/:id', (req, res) => {
-  const session = sessions.get(req.params.id);
-  if (!session) return res.status(404).json({ error: 'Session not found' });
+// ── Select account + role → exchange for temporary credentials ───────────────
+router.post('/select', async (req, res) => {
+  try {
+    const { sessionId, accountId, roleName } = req.body;
+    const sess = sessions.get(sessionId);
+    if (!sess || !sess.accessToken) return res.status(401).json({ error: 'Not authenticated' });
+
+    const sso = new SSOClient({ region: sess.region });
+    const creds = await sso.send(new GetRoleCredentialsCommand({
+      accessToken: sess.accessToken,
+      accountId,
+      roleName,
+    }));
+
+    sess.credentials = {
+      accessKeyId:     creds.roleCredentials.accessKeyId,
+      secretAccessKey: creds.roleCredentials.secretAccessKey,
+      sessionToken:    creds.roleCredentials.sessionToken,
+      expiration:      new Date(creds.roleCredentials.expiration * 1000),
+    };
+    sess.accountId = accountId;
+    sess.roleName  = roleName;
+    sessions.set(sessionId, sess);
+
+    res.json({ status: 'ok', accountId, roleName });
+  } catch (err) {
+    console.error('[auth/select]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Get session status (for page-reload restoration) ────────────────────────
+router.get('/session/:sessionId', (req, res) => {
+  const sess = sessions.get(req.params.sessionId);
+  if (!sess) return res.status(404).json({ error: 'Session not found' });
   res.json({
-    status:         session.status,
-    accountId:      session.accountId,
-    roleName:       session.roleName,
-    hasCredentials: !!session.credentials
+    hasCredentials: !!sess.credentials,
+    accountId:      sess.accountId,
+    roleName:       sess.roleName,
+    region:         sess.region,
   });
 });
 
-// ── DELETE /api/auth/session/:id ──────────────────────────────────────────────
-router.delete('/session/:id', (req, res) => {
-  sessions.delete(req.params.id);
-  res.json({ success: true });
+// ── Delete session (logout) ──────────────────────────────────────────────────
+router.delete('/session/:sessionId', (req, res) => {
+  sessions.delete(req.params.sessionId);
+  res.json({ status: 'ok' });
 });
 
+// Export sessions so other routes can access credentials
 module.exports = router;
 module.exports.sessions = sessions;

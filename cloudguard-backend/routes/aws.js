@@ -404,7 +404,7 @@ async function auditBilling(creds) {
   try {
     const pr = monthRange(1);
     const prev = await ce.send(new GetCostAndUsageCommand({
-      TimePeriod:  { Start: pr.start, End: toDate(new Date(pr.end + 'T00:00:00Z')) },
+      TimePeriod:  { Start: pr.start, End: pr.end },
       Granularity: 'MONTHLY',
       Metrics:     ['UnblendedCost'],
     }));

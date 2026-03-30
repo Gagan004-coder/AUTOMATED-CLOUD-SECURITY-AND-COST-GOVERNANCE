@@ -15,6 +15,7 @@ const awsRoutes          = require('./routes/aws');
 const notificationRoutes = require('./routes/notifications');
 const aiRoutes           = require('./routes/ai');
 const absence            = require('./services/absence');
+const db                 = require('./services/db');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -110,18 +111,24 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🛡️  CloudGuard Pro v2.6.0 → http://localhost:${PORT}`);
-  console.log(`   SSO Start URL   : ${process.env.AWS_SSO_START_URL || '(not set)'}`);
-  console.log(`   SSO Region      : ${process.env.AWS_SSO_REGION   || 'us-east-1'}`);
-  console.log(`   Email Provider  : ${
-    process.env.RESEND_API_KEY ? 'Resend' :
-    process.env.SENDGRID_API_KEY ? 'SendGrid' :
-    (process.env.SMTP_USER && process.env.SMTP_PASS) ? 'SMTP' : 'None (set RESEND_API_KEY)'}`);
-  console.log(`   Alert Email     : ${process.env.ALERT_EMAIL      || '(not set)'}`);
-  console.log(`   Absence Limit   : ${process.env.MAX_ABSENT_DAYS  || '5'} days`);
-  console.log(`   Cost Alert At   : $${process.env.COST_ALERT_THRESHOLD || '500'}`);
-  console.log(`   AI (Groq)       : ${process.env.GROQ_API_KEY ? '✓ configured' : '(not set)'}\n`);
+// Initialise DB first, then start listening
+db.initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🛡️  CloudGuard Pro v2.6.0 → http://localhost:${PORT}`);
+    console.log(`   SSO Start URL   : ${process.env.AWS_SSO_START_URL || '(not set)'}`);
+    console.log(`   SSO Region      : ${process.env.AWS_SSO_REGION   || 'us-east-1'}`);
+    console.log(`   Email Provider  : ${
+      process.env.RESEND_API_KEY ? 'Resend' :
+      process.env.SENDGRID_API_KEY ? 'SendGrid' :
+      (process.env.SMTP_USER && process.env.SMTP_PASS) ? 'SMTP' : 'None (set RESEND_API_KEY)'}`);
+    console.log(`   Alert Email     : ${process.env.ALERT_EMAIL      || '(not set)'}`);
+    console.log(`   Absence Limit   : ${process.env.MAX_ABSENT_DAYS  || '5'} days`);
+    console.log(`   Cost Alert At   : $${process.env.COST_ALERT_THRESHOLD || '500'}`);
+    console.log(`   AI (Groq)       : ${process.env.GROQ_API_KEY ? '✓ configured' : '(not set)'}\n`);
 
-  absence.startMonitoring();
+    absence.startMonitoring();
+  });
+}).catch(err => {
+  console.error('[FATAL] Could not initialise database:', err.message);
+  process.exit(1);
 });

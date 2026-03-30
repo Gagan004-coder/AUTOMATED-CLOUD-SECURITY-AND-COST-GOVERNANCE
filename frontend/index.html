@@ -7,6 +7,86 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Saira:wght@300;400;500;600&family=Saira+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* ════ ACCOUNT SWITCHER ════ */
+.acct-switcher{position:relative}
+.acct-switcher-btn{display:flex;align-items:center;gap:.55rem;padding:.35rem .75rem;background:var(--ink-3);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s;max-width:240px}
+.acct-switcher-btn:hover{border-color:var(--lime);background:var(--lime-dim)}
+.acct-switcher-avatar{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--lime),#8ecf00);display:grid;place-items:center;font-size:.65rem;font-weight:700;color:var(--ink);flex-shrink:0}
+.acct-switcher-info{min-width:0;text-align:left}
+.acct-switcher-name{font-family:var(--font-mono);font-size:.68rem;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.acct-switcher-role{font-family:var(--font-mono);font-size:.58rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.acct-switcher-caret{font-size:.6rem;color:var(--muted);flex-shrink:0;transition:transform .15s}
+.acct-switcher-btn.open .acct-switcher-caret{transform:rotate(180deg)}
+.acct-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:var(--ink-2);border:1px solid var(--border-hi);border-radius:12px;min-width:280px;z-index:200;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.6);display:none}
+.acct-dropdown.open{display:block;animation:dropIn .18s ease}
+@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.acct-drop-header{padding:.75rem 1rem;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.acct-drop-item{padding:.7rem 1rem;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--border)}
+.acct-drop-item:last-child{border-bottom:none}
+.acct-drop-item:hover{background:rgba(255,255,255,.04)}
+.acct-drop-item.current{background:var(--lime-dim);border-left:2px solid var(--lime)}
+.acct-drop-name{font-size:.82rem;font-weight:500;color:var(--white)}
+.acct-drop-id{font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-top:.1rem}
+.acct-drop-roles{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem}
+.acct-drop-role{padding:.18rem .5rem;background:var(--ink-4);border:1px solid var(--border);border-radius:4px;font-size:.6rem;font-family:var(--font-mono);color:var(--muted-hi);cursor:pointer;transition:all .12s}
+.acct-drop-role:hover,.acct-drop-role.active{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+.acct-drop-footer{padding:.6rem 1rem;border-top:1px solid var(--border);display:flex;gap:.5rem}
+.acct-drop-action{flex:1;padding:.35rem;background:transparent;border:1px solid var(--border);border-radius:5px;font-family:var(--font-mono);font-size:.62rem;color:var(--muted-hi);cursor:pointer;transition:all .12s;text-align:center}
+.acct-drop-action:hover{border-color:var(--lime);color:var(--lime)}
+.acct-drop-action.danger:hover{border-color:var(--red);color:var(--red)}
+/* ════ OVERVIEW HERO REDESIGN ════ */
+.ov-hero{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem}
+.ov-hero-card{background:var(--ink-2);border:1px solid var(--border);border-radius:14px;padding:1.5rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s}
+.ov-hero-card:hover{border-color:var(--border-hi);transform:translateY(-1px)}
+.ov-hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:.7}
+.ov-hero-card.lime::before{background:linear-gradient(90deg,var(--lime),transparent)}
+.ov-hero-card.red::before{background:linear-gradient(90deg,var(--red),transparent)}
+.ov-hero-card.amber::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.ov-hero-card.sky::before{background:linear-gradient(90deg,var(--sky),transparent)}
+.ov-hero-card.purple::before{background:linear-gradient(90deg,var(--purple),transparent)}
+.ov-hero-glow{position:absolute;width:120px;height:120px;border-radius:50%;opacity:.06;right:-20px;bottom:-20px;filter:blur(30px)}
+.ov-hero-card.lime .ov-hero-glow{background:var(--lime)}
+.ov-hero-card.red .ov-hero-glow{background:var(--red)}
+.ov-hero-card.amber .ov-hero-glow{background:var(--amber)}
+.ov-hero-card.sky .ov-hero-glow{background:var(--sky)}
+.ov-hero-label{font-family:var(--font-mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
+.ov-hero-icon{font-size:.85rem}
+.ov-hero-val{font-family:var(--font-head);font-weight:700;font-size:2.4rem;letter-spacing:-.04em;line-height:1;margin-bottom:.4rem}
+.ov-hero-sub{font-size:.72rem;color:var(--muted);line-height:1.4}
+.ov-hero-bar{height:2px;background:var(--ink-3);border-radius:2px;overflow:hidden;margin-top:.875rem}
+.ov-hero-bar-fill{height:100%;border-radius:2px;transition:width 1.4s cubic-bezier(.22,1,.36,1)}
+/* overview 3-col layout */
+.ov-grid{display:grid;grid-template-columns:1fr 340px;gap:1.25rem;margin-bottom:1.25rem}
+.ov-col-left{display:flex;flex-direction:column;gap:1.25rem}
+.ov-col-right{display:flex;flex-direction:column;gap:1.25rem}
+/* account info banner in overview */
+.ov-acct-banner{background:linear-gradient(135deg,rgba(198,241,53,.08),rgba(71,200,255,.04));border:1px solid rgba(198,241,53,.12);border-radius:12px;padding:1rem 1.375rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.ov-acct-left{display:flex;align-items:center;gap:.875rem}
+.ov-acct-dot{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);animation:pulse 2s infinite;flex-shrink:0}
+.ov-acct-id{font-family:var(--font-head);font-weight:700;font-size:.88rem;letter-spacing:-.01em}
+.ov-acct-meta{font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-top:.15rem}
+.ov-acct-right{display:flex;align-items:center;gap:.75rem}
+.ov-acct-badge{font-family:var(--font-mono);font-size:.62rem;padding:.25rem .65rem;border-radius:4px;border:1px solid rgba(198,241,53,.2);background:var(--lime-dim);color:var(--lime)}
+/* insight cards */
+.insight-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:1.25rem}
+.insight-card{background:var(--ink-3);border:1px solid var(--border);border-radius:10px;padding:.875rem 1rem;cursor:pointer;transition:all .15s}
+.insight-card:hover{border-color:var(--border-hi);background:rgba(255,255,255,.03)}
+.insight-card-icon{font-size:1.2rem;margin-bottom:.35rem}
+.insight-card-num{font-family:var(--font-head);font-size:1.5rem;font-weight:700;margin-bottom:.2rem}
+.insight-card-label{font-family:var(--font-mono);font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+/* score ring panel redesign */
+.score-panel{background:var(--ink-2);border:1px solid var(--border);border-radius:14px;padding:1.5rem;text-align:center}
+.score-grade{font-family:var(--font-head);font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:.25rem .8rem;border-radius:20px;display:inline-block;margin-top:.5rem}
+.grade-a{background:rgba(198,241,53,.12);color:var(--lime);border:1px solid rgba(198,241,53,.2)}
+.grade-b{background:rgba(255,181,71,.12);color:var(--amber);border:1px solid rgba(255,181,71,.2)}
+.grade-c{background:rgba(255,71,71,.12);color:var(--red);border:1px solid rgba(255,71,71,.2)}
+/* quick actions redesign */
+.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.qa-btn{padding:.875rem;background:var(--ink-3);border:1px solid var(--border);border-radius:9px;cursor:pointer;transition:all .14s;text-align:left;display:flex;align-items:center;gap:.65rem}
+.qa-btn:hover{border-color:var(--lime);background:var(--lime-dim);transform:translateY(-1px)}
+.qa-btn-icon{font-size:1.1rem;flex-shrink:0}
+.qa-btn-label{font-size:.78rem;font-weight:500;color:var(--white);line-height:1.3}
+.qa-btn-sub{font-family:var(--font-mono);font-size:.6rem;color:var(--muted);margin-top:.1rem}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 :root{
@@ -104,6 +184,8 @@ body::after{content:'';position:fixed;inset:0;
 .logout-btn{padding:.35rem .75rem;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted-hi);font-family:var(--font-mono);font-size:.68rem;cursor:pointer;transition:all .12s}
 .logout-btn:hover{border-color:var(--red);color:var(--red)}
 .content{padding:1.75rem 2rem;flex:1}
+.switch-acct-btn{width:100%;padding:.45rem;background:transparent;border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);font-size:.62rem;color:var(--muted);cursor:pointer;transition:all .12s;margin-top:.4rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.switch-acct-btn:hover{border-color:var(--lime);color:var(--lime)}
 .tab-content{display:none}.tab-content.active{display:block}
 
 /* ── Metrics ── */
@@ -512,7 +594,7 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
       <div class="logo-mark">CG</div>
       <div>
         <div class="logo-text">CloudGuard Pro</div>
-        <div class="logo-ver">v2.5.0 · AWS SSO</div>
+        <div class="logo-ver">v2.6.0 · AWS SSO</div>
       </div>
     </div>
     <div class="sidebar-account">
@@ -540,6 +622,7 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
     <div class="sidebar-footer">
       <div class="last-scan" id="last-scan">Last scan: never</div>
       <button class="scan-btn" id="scan-btn" onclick="runScan()">⬡ Full Scan</button>
+      <button class="switch-acct-btn" onclick="openAccountSwitcher()">⇄ Switch Account</button>
     </div>
   </aside>
 
@@ -551,7 +634,26 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
       </div>
       <div class="topbar-right">
         <div class="clock" id="clock">--:--:--</div>
-            <button class="icon-btn" id="theme-btn" onclick="toggleTheme()">☀️</button>
+        <!-- Account Switcher -->
+        <div class="acct-switcher" id="acct-switcher">
+          <div class="acct-switcher-btn" id="acct-switcher-btn" onclick="toggleAccountDropdown()">
+            <div class="acct-switcher-avatar" id="acct-switcher-avatar">CG</div>
+            <div class="acct-switcher-info">
+              <div class="acct-switcher-name" id="acct-switcher-name">Loading...</div>
+              <div class="acct-switcher-role" id="acct-switcher-role">—</div>
+            </div>
+            <span class="acct-switcher-caret">▾</span>
+          </div>
+          <div class="acct-dropdown" id="acct-dropdown">
+            <div class="acct-drop-header">AWS Accounts</div>
+            <div id="acct-drop-list"><div style="padding:.75rem 1rem;font-size:.75rem;color:var(--muted)">No other accounts cached</div></div>
+            <div class="acct-drop-footer">
+              <button class="acct-drop-action" onclick="addNewAccount()">＋ Add Account</button>
+              <button class="acct-drop-action danger" onclick="logout()">Disconnect</button>
+            </div>
+          </div>
+        </div>
+        <button class="icon-btn" id="theme-btn" onclick="toggleTheme()">☀️</button>
         <button class="icon-btn" onclick="loadAllData()" title="Refresh">↻</button>
         <button class="logout-btn" onclick="logout()">Disconnect ×</button>
       </div>
@@ -561,81 +663,145 @@ body.light .ai-tab-input{background:#e8e8e8;border-color:#ccc;color:#111}
 
       <!-- ═══ OVERVIEW ═══ -->
       <div class="tab-content active" id="tab-overview">
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--lime),transparent)"></div>
-            <div class="metric-icon">🛡️</div>
-            <div class="metric-lbl">Security Score</div>
-            <div class="metric-val" id="m-score" style="color:var(--lime)">—</div>
-            <div class="metric-sub">/ 100</div>
-            <div class="progress-bar"><div class="progress-fill" id="score-bar" style="background:var(--lime);width:0%"></div></div>
+
+        <!-- Account Banner -->
+        <div class="ov-acct-banner">
+          <div class="ov-acct-left">
+            <div class="ov-acct-dot"></div>
+            <div>
+              <div class="ov-acct-id" id="ov-acct-id">AWS Account —</div>
+              <div class="ov-acct-meta" id="ov-acct-meta">Loading account details...</div>
+            </div>
           </div>
-          <div class="metric-card">
-            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--red),transparent)"></div>
-            <div class="metric-icon">⚠️</div>
-            <div class="metric-lbl">Critical Issues</div>
-            <div class="metric-val" id="m-critical" style="color:var(--red)">—</div>
-            <div class="metric-sub">Needs immediate action</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--amber),transparent)"></div>
-            <div class="metric-icon">💰</div>
-            <div class="metric-lbl">Monthly Spend</div>
-            <div class="metric-val" id="m-cost" style="color:var(--amber)">—</div>
-            <div class="metric-sub" id="m-cost-change">Loading billing...</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-stripe" style="background:linear-gradient(90deg,var(--sky),transparent)"></div>
-            <div class="metric-icon">🖥️</div>
-            <div class="metric-lbl">Running Instances</div>
-            <div class="metric-val" id="m-instances" style="color:var(--sky)">—</div>
-            <div class="metric-sub" id="m-instance-cost">Estimated cost</div>
+          <div class="ov-acct-right">
+            <span class="ov-acct-badge" id="ov-acct-region">us-east-1</span>
+            <button onclick="openAccountSwitcher()" style="padding:.3rem .8rem;background:transparent;border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);font-size:.62rem;color:var(--muted-hi);cursor:pointer;transition:all .12s" onmouseover="this.style.borderColor='var(--lime)';this.style.color='var(--lime)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted-hi)'">⇄ Switch Account</button>
           </div>
         </div>
-        <div class="two-col">
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Cost Trends — 6 Months</div>
-              <div class="panel-badge" id="billing-currency">USD</div>
-            </div>
-            <div class="panel-body">
-              <div class="bar-chart" id="bar-chart"><div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">Loading billing data...</div></div>
-            </div>
+
+        <!-- Hero Metric Cards -->
+        <div class="ov-hero">
+          <div class="ov-hero-card lime">
+            <div class="ov-hero-glow"></div>
+            <div class="ov-hero-label"><span class="ov-hero-icon">🛡️</span> Security Score</div>
+            <div class="ov-hero-val" id="m-score" style="color:var(--lime)">—</div>
+            <div class="ov-hero-sub">/ 100 — <span id="score-grade-text">Analyzing...</span></div>
+            <div class="ov-hero-bar"><div class="ov-hero-bar-fill" id="score-bar" style="background:var(--lime);width:0%"></div></div>
           </div>
-          <div class="col-stack">
-            <div class="panel">
-              <div class="score-wrap">
-                <div class="ring">
-                  <svg width="120" height="120" viewBox="0 0 120 120">
-                    <circle class="ring-track" cx="60" cy="60" r="50"/>
-                    <circle class="ring-fill" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16" id="ring-fill"/>
-                  </svg>
-                  <div class="ring-text"><div class="ring-num" id="ring-num">—</div><div class="ring-sub">Score</div></div>
-                </div>
-                <div class="score-desc" id="score-desc">Analyzing account...</div>
-              </div>
-            </div>
-            <div class="panel">
-              <div class="panel-header"><div class="panel-title">Quick Actions</div></div>
-              <div class="panel-body" style="padding:1rem">
-                <div class="action-grid">
-                  <button class="action-item" onclick="loadAllData()"><div class="action-icon">↻</div><div class="action-lbl">Refresh All</div></button>
-                  <button class="action-item" onclick="downloadReport()"><div class="action-icon">📄</div><div class="action-lbl">Export PDF</div></button>
-                  <button class="action-item" onclick="setTab('autofix',document.querySelector('[onclick*=autofix]'))"><div class="action-icon">🔧</div><div class="action-lbl">Auto-Fix Issues</div></button>
-                  <button class="action-item" onclick="setTab('notifications',document.querySelector('[onclick*=notifications]'))"><div class="action-icon">📧</div><div class="action-lbl">Email Alerts</div></button>
-                </div>
-              </div>
-            </div>
+          <div class="ov-hero-card red">
+            <div class="ov-hero-glow"></div>
+            <div class="ov-hero-label"><span class="ov-hero-icon">⚠️</span> Critical Issues</div>
+            <div class="ov-hero-val" id="m-critical" style="color:var(--red)">—</div>
+            <div class="ov-hero-sub">Requires immediate action</div>
+          </div>
+          <div class="ov-hero-card amber">
+            <div class="ov-hero-glow"></div>
+            <div class="ov-hero-label"><span class="ov-hero-icon">💰</span> Monthly Spend</div>
+            <div class="ov-hero-val" id="m-cost" style="color:var(--amber)">—</div>
+            <div class="ov-hero-sub" id="m-cost-change">Loading billing...</div>
+          </div>
+          <div class="ov-hero-card sky">
+            <div class="ov-hero-glow"></div>
+            <div class="ov-hero-label"><span class="ov-hero-icon">🖥️</span> EC2 Running</div>
+            <div class="ov-hero-val" id="m-instances" style="color:var(--sky)">—</div>
+            <div class="ov-hero-sub" id="m-instance-cost">Estimated cost</div>
           </div>
         </div>
-        <div class="two-col">
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title">Top Security Issues</div><div class="panel-badge" id="ov-sec-count">—</div></div>
-            <div class="issue-list" id="ov-sec-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+
+        <!-- Insight Strip -->
+        <div class="insight-row">
+          <div class="insight-card" onclick="setTab('security',document.querySelector('[onclick*=security]'))">
+            <div class="insight-card-icon">🪣</div>
+            <div class="insight-card-num" id="ic-s3-vuln" style="color:var(--red)">—</div>
+            <div class="insight-card-label">Vulnerable S3 Buckets</div>
           </div>
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title">Top AWS Services by Cost</div><div class="panel-badge" id="ov-svc-count">—</div></div>
-            <div class="panel-body" id="ov-svc-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading billing...</div></div></div>
+          <div class="insight-card" onclick="setTab('iam',document.querySelector('[onclick*=iam]'))">
+            <div class="insight-card-icon">👥</div>
+            <div class="insight-card-num" id="ic-iam-issues" style="color:var(--amber)">—</div>
+            <div class="insight-card-label">IAM Users w/ Issues</div>
+          </div>
+          <div class="insight-card" onclick="setTab('billing',document.querySelector('[onclick*=billing]'))">
+            <div class="insight-card-icon">📈</div>
+            <div class="insight-card-num" id="ic-forecast" style="color:var(--sky)">—</div>
+            <div class="insight-card-label">EOM Forecast</div>
+          </div>
+        </div>
+
+        <!-- Main 2-col grid -->
+        <div class="ov-grid">
+          <div class="ov-col-left">
+            <!-- Cost trend -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">📈 6-Month Cost Trend</div>
+                <div class="panel-badge" id="billing-currency">USD</div>
+              </div>
+              <div class="panel-body">
+                <div class="bar-chart" id="bar-chart"><div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">Loading billing data...</div></div>
+              </div>
+            </div>
+            <!-- Top Issues -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">🔴 Top Security Issues</div>
+                <div class="panel-badge" id="ov-sec-count">—</div>
+              </div>
+              <div class="issue-list" id="ov-sec-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading...</div></div></div>
+            </div>
+          </div>
+
+          <div class="ov-col-right">
+            <!-- Score panel -->
+            <div class="score-panel">
+              <div class="ring">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <circle class="ring-track" cx="60" cy="60" r="50"/>
+                  <circle class="ring-fill" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16" id="ring-fill"/>
+                </svg>
+                <div class="ring-text"><div class="ring-num" id="ring-num">—</div><div class="ring-sub">Score</div></div>
+              </div>
+              <div class="score-desc" id="score-desc">Analyzing account...</div>
+              <div id="score-grade-badge" class="score-grade grade-b" style="margin-top:.75rem">LOADING</div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="panel">
+              <div class="panel-header"><div class="panel-title">⚡ Quick Actions</div></div>
+              <div class="panel-body" style="padding:.875rem">
+                <div class="qa-grid">
+                  <button class="qa-btn" onclick="loadAllData()">
+                    <span class="qa-btn-icon">↻</span>
+                    <div><div class="qa-btn-label">Refresh All</div><div class="qa-btn-sub">Reload AWS data</div></div>
+                  </button>
+                  <button class="qa-btn" onclick="downloadReport()">
+                    <span class="qa-btn-icon">📄</span>
+                    <div><div class="qa-btn-label">Export PDF</div><div class="qa-btn-sub">Full audit report</div></div>
+                  </button>
+                  <button class="qa-btn" onclick="setTab('autofix',document.querySelector('[onclick*=autofix]'))">
+                    <span class="qa-btn-icon">🔧</span>
+                    <div><div class="qa-btn-label">Auto-Fix</div><div class="qa-btn-sub">Apply remediations</div></div>
+                  </button>
+                  <button class="qa-btn" onclick="setTab('notifications',document.querySelector('[onclick*=notifications]'))">
+                    <span class="qa-btn-icon">📧</span>
+                    <div><div class="qa-btn-label">Email Alerts</div><div class="qa-btn-sub">Notification center</div></div>
+                  </button>
+                  <button class="qa-btn" onclick="openAccountSwitcher()">
+                    <span class="qa-btn-icon">⇄</span>
+                    <div><div class="qa-btn-label">Switch Account</div><div class="qa-btn-sub">Change AWS role</div></div>
+                  </button>
+                  <button class="qa-btn" onclick="setTab('ai',document.querySelector('[onclick*=\"ai\"]'))">
+                    <span class="qa-btn-icon">🤖</span>
+                    <div><div class="qa-btn-label">AI Assistant</div><div class="qa-btn-sub">Ask anything</div></div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Top Services -->
+            <div class="panel">
+              <div class="panel-header"><div class="panel-title">💸 Top Services by Cost</div><div class="panel-badge" id="ov-svc-count">—</div></div>
+              <div class="panel-body" id="ov-svc-list"><div class="empty"><div class="empty-icon">⟳</div><div class="empty-text">Loading billing...</div></div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1116,9 +1282,14 @@ async function selectAccount(accountId, roleName) {
   try {
     await api('POST', '/auth/select', { sessionId: S.sessionId, accountId, roleName });
     S.accountId = accountId; S.roleName = roleName;
+    // Store region from the known accounts if available
+    const known = (S.knownAccounts || []).find(a => a.accountId === accountId);
+    if (known) S.accountName = known.accountName;
     localStorage.setItem('cg_account', accountId);
     localStorage.setItem('cg_role', roleName);
+    closeAccountDropdown();
     showApp();
+    toast(`Switched to ${accountId} / ${roleName}`, 'success');
     await loadAllData();
     checkEmailConfig();
   } catch (err) {
@@ -1139,6 +1310,8 @@ function showApp() {
   if (fab) fab.style.display = 'flex';
   document.getElementById('sb-account').textContent = S.accountId || '—';
   document.getElementById('sb-role').textContent    = S.roleName  || '—';
+  updateAccountSwitcherUI();
+  refreshAccountDropdown();
 
   // Check AI status and show badge
   fetch(API + '/api/ai/status', { headers: { 'x-session-id': S.sessionId || '' } })
@@ -1174,6 +1347,106 @@ function logout() {
   if (S._keepAliveTimer) clearInterval(S._keepAliveTimer);
   localStorage.clear();
   location.reload();
+}
+
+// ─── ACCOUNT SWITCHER ────────────────────────────────────────────────────────
+// Restore cached accounts on startup
+try {
+  const cached = localStorage.getItem('cg_accounts');
+  if (cached) S.knownAccounts = JSON.parse(cached);
+} catch {}
+
+function updateAccountSwitcherUI() {
+  const nameEl   = document.getElementById('acct-switcher-name');
+  const roleEl   = document.getElementById('acct-switcher-role');
+  const avatarEl = document.getElementById('acct-switcher-avatar');
+  if (!nameEl) return;
+  const accountName = S.accountName || S.accountId || 'Unknown Account';
+  // Abbreviate long account IDs
+  const displayName = accountName.length > 18 ? accountName.slice(0, 18) + '…' : accountName;
+  nameEl.textContent   = displayName;
+  roleEl.textContent   = S.roleName || '—';
+  if (avatarEl) avatarEl.textContent = (accountName[0] || 'A').toUpperCase();
+}
+
+function refreshAccountDropdown() {
+  const list = document.getElementById('acct-drop-list');
+  if (!list) return;
+  const accounts = S.knownAccounts || [];
+  if (!accounts.length) {
+    list.innerHTML = '<div style="padding:.75rem 1rem;font-size:.75rem;color:var(--muted)">No cached accounts — connect via SSO to load accounts</div>';
+    return;
+  }
+  list.innerHTML = accounts.map(acc => {
+    const isCurrent = acc.accountId === S.accountId;
+    return `<div class="acct-drop-item ${isCurrent ? 'current' : ''}">
+      <div class="acct-drop-name">${acc.accountName || 'Unnamed Account'}${isCurrent ? ' <span style="font-size:.6rem;color:var(--lime);font-family:var(--font-mono)">(active)</span>' : ''}</div>
+      <div class="acct-drop-id">${acc.accountId}</div>
+      <div class="acct-drop-roles">
+        ${(acc.roles || []).map(r => `<div class="acct-drop-role ${isCurrent && r.roleName === S.roleName ? 'active' : ''}" onclick="selectAccount('${acc.accountId}','${r.roleName}')">${r.roleName}</div>`).join('')}
+        ${!acc.roles?.length ? '<span style="font-size:.62rem;color:var(--muted)">No roles</span>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAccountDropdown() {
+  const btn      = document.getElementById('acct-switcher-btn');
+  const dropdown = document.getElementById('acct-dropdown');
+  if (!btn || !dropdown) return;
+  const isOpen = dropdown.classList.contains('open');
+  if (isOpen) {
+    closeAccountDropdown();
+  } else {
+    btn.classList.add('open');
+    dropdown.classList.add('open');
+    refreshAccountDropdown();
+  }
+}
+
+function closeAccountDropdown() {
+  const btn      = document.getElementById('acct-switcher-btn');
+  const dropdown = document.getElementById('acct-dropdown');
+  if (btn) btn.classList.remove('open');
+  if (dropdown) dropdown.classList.remove('open');
+}
+
+function openAccountSwitcher() {
+  closeAccountDropdown();
+  // If we have known accounts, show the login modal at the accounts step
+  if (S.knownAccounts && S.knownAccounts.length) {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('main-app').style.display = 'none';
+    renderAccountList(S.knownAccounts);
+  } else {
+    // No cached accounts — start fresh SSO flow
+    addNewAccount();
+  }
+}
+
+function addNewAccount() {
+  closeAccountDropdown();
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  // Reset to first step
+  document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+  document.getElementById('step-url').classList.add('active');
+  const btn = document.getElementById('btn-start-sso');
+  if (btn) { btn.disabled = false; btn.textContent = 'Connect via AWS SSO →'; }
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  const sw = document.getElementById('acct-switcher');
+  if (sw && !sw.contains(e.target)) closeAccountDropdown();
+});
+
+// Helper to navigate to AI tab cleanly
+function goToAI() {
+  const navItems = document.querySelectorAll('.nav-item');
+  for (const item of navItems) {
+    if (item.textContent.includes('AI')) { setTab('ai', item); return; }
+  }
 }
 
 // ─── DATA LOADING ────────────────────────────────────────────────────────────
@@ -1232,6 +1505,7 @@ function renderOverview() {
   const vulnPct    = Math.min(100, ((s3.vulnerableCount || 0) / Math.max(1, s3.totalBuckets || 1)) * 100);
   const iamPct     = Math.min(100, (((iam.summary || {}).usersWithIssues || 0) / Math.max(1, (iam.summary || {}).totalUsers || 1)) * 100);
   const score      = Math.round(100 - (vulnPct * 0.6) - (iamPct * 0.4));
+
   setText('m-score', score);
   setText('m-critical', critical);
   setText('m-instances', (ec2.summary || {}).runningInstances ?? '—');
@@ -1240,28 +1514,59 @@ function renderOverview() {
   setText('m-cost', costCurrent != null ? '$' + fmt(costCurrent) : '—');
   const ch = (bil.summary || {}).percentChange;
   setText('m-cost-change', ch != null ? `${ch > 0 ? '+' : ''}${ch}% vs last month` : 'Billing data');
+
+  // Score ring
   const ringFill = document.getElementById('ring-fill');
   const circ = 314.16;
   ringFill.style.strokeDashoffset = circ - (circ * score / 100);
   ringFill.style.stroke = score >= 80 ? 'var(--lime)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
   setText('ring-num', score);
-  document.getElementById('score-bar').style.width = score + '%';
-  setText('score-desc', score >= 80 ? 'Good posture. Minor issues detected.' : score >= 60 ? 'Some vulnerabilities need attention.' : 'Critical issues found — act now.');
+  const scoreBar = document.getElementById('score-bar');
+  if (scoreBar) scoreBar.style.width = score + '%';
+  const scoreDesc = score >= 80 ? 'Good security posture. Minor issues found.' : score >= 60 ? 'Some vulnerabilities need attention.' : 'Critical issues found — take action now.';
+  setText('score-desc', scoreDesc);
+  const gradeEl = document.getElementById('score-grade-badge');
+  const gradeText = document.getElementById('score-grade-text');
+  if (gradeEl) {
+    const isA = score >= 80, isB = score >= 60;
+    gradeEl.className = 'score-grade ' + (isA ? 'grade-a' : isB ? 'grade-b' : 'grade-c');
+    gradeEl.textContent = isA ? 'GRADE A — SECURE' : isB ? 'GRADE B — REVIEW' : 'GRADE C — AT RISK';
+  }
+  if (gradeText) gradeText.textContent = score >= 80 ? 'Good' : score >= 60 ? 'Fair' : 'At Risk';
+
+  // Badges
   setText('badge-sec', s3.vulnerableCount ?? '—');
   setText('badge-ec2', (ec2.summary || {}).idleInstances ?? '—');
   setText('badge-iam', (iam.summary || {}).usersWithIssues ?? '—');
   setText('badge-billing', costCurrent != null ? '$' + fmt(costCurrent) : '$—');
-  const vulnBuckets = (s3.vulnerableBuckets || []).slice(0, 4);
+
+  // Insight strip
+  setText('ic-s3-vuln',   s3.vulnerableCount ?? '—');
+  setText('ic-iam-issues', (iam.summary || {}).usersWithIssues ?? '—');
+  const fc = (bil.summary || {}).forecastedCost;
+  setText('ic-forecast', fc != null ? '$' + fmt(fc) : '—');
+
+  // Account banner
+  const region = S.region || 'us-east-1';
+  setText('ov-acct-id', 'Account: ' + (S.accountId || '—'));
+  setText('ov-acct-meta', `Role: ${S.roleName || '—'} · Region: ${region}`);
+  setText('ov-acct-region', region);
+
+  // Issues list
+  const vulnBuckets = (s3.vulnerableBuckets || []).slice(0, 5);
   setText('ov-sec-count', vulnBuckets.length + ' issues');
   document.getElementById('ov-sec-list').innerHTML = vulnBuckets.length
     ? vulnBuckets.map(b => issueRow(b.name, b.issues?.join(', ') || '', b.severity)).join('')
     : empty('No S3 vulnerabilities detected ✅');
+
+  // Services
   const svcs = (bil.serviceBreakdown || []).slice(0, 5);
   const maxSvc = svcs[0]?.cost || 1;
   setText('ov-svc-count', svcs.length + ' services');
   document.getElementById('ov-svc-list').innerHTML = svcs.length
     ? svcs.map(s => `<div class="service-row"><div class="service-name">${s.service.replace('Amazon ','').replace('AWS ','')}</div><div class="service-bar-wrap"><div class="service-bar-fill" style="width:${Math.round(s.cost/maxSvc*100)}%"></div></div><div class="service-cost">$${s.cost.toFixed(0)}</div></div>`).join('')
     : empty('No billing data available');
+
   renderBarChart('bar-chart', bil.monthlyTrend || []);
 }
 

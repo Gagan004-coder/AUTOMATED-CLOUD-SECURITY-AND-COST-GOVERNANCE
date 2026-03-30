@@ -8,6 +8,8 @@ const absenceSvc = require('../services/absence');
 const db         = require('../services/db');
 const { sessions } = require('./auth');
 const autofix    = require('../services/autofix');
+const billing    = require('../services/billing');
+const costAlerts = require('../services/costAlerts');
 
 function getAccountId(req) {
   const sessionId = req.headers['x-session-id'];
@@ -266,4 +268,15 @@ router.get('/autofix/list', (req, res) => {
   res.json({ fixes: autofix.listFixes() });
 });
 
+// ── Expose applyFix for use by AI route ──────────────────────────────────────
+function applyFixFn({ fixId, params }, creds, region) {
+  return autofix.applyFixes({
+    fixes:       [{ fixId, params, resource: params?.bucket || params?.instanceId || params?.volumeId || fixId }],
+    credentials: creds,
+    region:      region || 'us-east-1',
+    accountId:   'ai-invoked',
+  }).then(results => results[0]?.details || 'Done');
+}
+
 module.exports = router;
+module.exports.applyFixFn = applyFixFn;

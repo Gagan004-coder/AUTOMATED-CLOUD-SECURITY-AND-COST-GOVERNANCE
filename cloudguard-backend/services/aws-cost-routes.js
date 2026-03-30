@@ -1,5 +1,6 @@
-// services/email.js — CloudGuard Pro Email Service
-// Supports: Resend API (primary), SendGrid, SMTP (nodemailer) fallback
+// services/aws-cost-routes.js — CloudGuard Pro Standalone Email Helper (legacy)
+// This is a self-contained email sender kept for backward compatibility.
+// The primary email service is services/email.js
 'use strict';
 
 const alertRecipients = () => (process.env.ALERT_EMAIL || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -28,7 +29,7 @@ async function sendEmail({ to, subject, html }) {
   const provider = detectProvider();
   if (!provider) throw new Error('No email provider configured. Set RESEND_API_KEY or SMTP_USER+SMTP_PASS in your .env file.');
 
-  const toAddresses = Array.isArray(to) ? to : [to];
+  const toAddresses = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
   if (!toAddresses.length) throw new Error('No recipient email address specified');
 
   if (provider === 'resend') {

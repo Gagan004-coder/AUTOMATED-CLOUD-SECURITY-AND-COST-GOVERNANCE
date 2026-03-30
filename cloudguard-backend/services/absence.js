@@ -106,7 +106,7 @@ function startMonitoring() {
           service:  'absence',
           issues:   [`Auto-stop triggered: ${daysMissing} days absent (threshold: ${threshold})`],
           severity: 'critical',
-        }]).catch(() => {});
+        }], null, userId).catch(() => {});
 
       } else if (daysMissing >= 3 && !user.warningEmailSent) {
         user.warningEmailSent = true;

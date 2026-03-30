@@ -202,6 +202,11 @@ async function getCostSummary(credentials) {
     : 0;
 
   let forecastedCost = await getForecast(credentials);
+  // getForecast returns only the *remaining* days' cost from CE.
+  // Add current month's spend to get the full projected monthly total.
+  if (forecastedCost != null) {
+    forecastedCost = parseFloat((current + forecastedCost).toFixed(2));
+  }
   const forecastModel = buildForecast(monthly);
   if (forecastedCost == null && forecastModel) {
     forecastedCost = forecastModel.forecasts[0]?.projected ?? null;

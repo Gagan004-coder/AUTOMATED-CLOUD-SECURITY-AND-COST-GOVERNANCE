@@ -10,6 +10,9 @@
  *   router.post('/cost/ai-alert', handleAICostAlert);
  */
 
+// Import email send helper
+const { sendEmail } = require('./email');
+
 // ── POST /api/notify/cost/ai-alert ────────────────────────────────────────────
 // Triggered automatically when anomalies or threshold breaches are detected.
 // Sends a rich HTML email with alerts, remediation plan, and forecast.
@@ -40,9 +43,8 @@ async function handleAICostAlert(req, res) {
     const html    = buildCostAlertEmailHtml(alerts, costSummary, remediation, req.headers['x-account-id']);
     const subject = `⚠️ CloudGuard Cost Alert — ${alerts.length} issue(s) detected`;
 
-    // Send via existing email helper (reuse whatever send function is in notifications.js)
-    // Replace `sendEmail` with your actual helper name if different
-    await sendEmail({ to: recipients.join(','), subject, html });
+    // Send using the email service helper
+    await sendEmail({ to: recipients, subject, html, emailType: 'cost' });
 
     res.json({
       sent:      true,

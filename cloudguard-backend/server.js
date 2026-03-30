@@ -99,9 +99,11 @@ app.get('/api/health', (_, res) => res.json({
 }));
 
 // ── Serve frontend ────────────────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, '..')));
+const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
+app.use(express.static(FRONTEND_DIR));         // frontend/ first
+app.use(express.static(path.join(__dirname, '..'))); // root fallback
 app.get('*', (_, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
 // ── Global error handler ──────────────────────────────────────────────────────

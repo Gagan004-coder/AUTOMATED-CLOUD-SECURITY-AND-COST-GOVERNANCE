@@ -1256,8 +1256,28 @@ function openVerifyUrl() {
 async function pollAuth() {
   try {
     const r = await api('POST', '/auth/poll', { sessionId: S.sessionId });
-    if (r.status === 'authorized') { clearInterval(S.pollTimer); renderAccountList(r.accounts); }
-  } catch {}
+    if (r.status === 'authorized') {
+      clearInterval(S.pollTimer);
+      S.pollTimer = null;
+      renderAccountList(r.accounts);
+    } else if (r.status === 'slow_down') {
+      // Back off — increase interval
+      clearInterval(S.pollTimer);
+      S.pollTimer = setInterval(() => pollAuth(), 10000);
+    }
+  } catch (err) {
+    // Stop polling on terminal errors (404 = session gone, 410 = expired)
+    if (err.status === 404 || err.status === 410) {
+      clearInterval(S.pollTimer);
+      S.pollTimer = null;
+      if (err.status === 410) {
+        toast('Device authorization expired. Please restart SSO.', 'warn');
+        showStep('step-url');
+      }
+      // 404 = server restarted mid-flow — quietly reset
+    }
+    // Other errors: continue polling silently
+  }
 }
 
 function renderAccountList(accounts) {
@@ -2003,11 +2023,25 @@ async function sendWeeklySummaryNow() {
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function renderBarChart(id, trend) {
   const el = document.getElementById(id);
-  if (!trend || !trend.length) { el.innerHTML = '<div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">No data</div>'; return; }
-  const max = Math.max(...trend.map(d => d.cost));
-  el.innerHTML = trend.map(d => {
-    const pct = Math.max(8, (d.cost / max) * 100);
-    return `<div class="bar-wrap"><div class="bar" style="height:${pct}%" data-tip="$${fmt(d.cost)}"></div><div class="bar-lbl">${d.month}</div></div>`;
+  if (!el) return;
+  if (!trend || !trend.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.75rem;width:100%;text-align:center">No billing data available</div>';
+    return;
+  }
+  const max = Math.max(...trend.map(d => d.cost), 1);
+  // Color palette cycling through lime → sky → amber → purple
+  const colors = ['#c6f135','#47c8ff','#ffb547','#a78bfa','#ff4747','#2de8a0'];
+  el.innerHTML = trend.map((d, i) => {
+    const pct   = Math.max(10, Math.round((d.cost / max) * 100));
+    const color = colors[i % colors.length];
+    const isLast = i === trend.length - 1;
+    return `<div class="bar-wrap">
+      <div class="bar" style="height:${pct}%;background:${color}22;border-color:${color}44;position:relative" data-tip="$${fmt(d.cost)}">
+        <div style="position:absolute;bottom:0;left:0;right:0;height:${pct}%;background:linear-gradient(180deg,${color}55,${color}22);border-radius:4px 4px 0 0;min-height:8px"></div>
+        ${isLast ? `<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:.56rem;color:${color};white-space:nowrap">▲ now</div>` : ''}
+      </div>
+      <div class="bar-lbl" style="color:${isLast?color:'var(--muted)'}">${d.month}</div>
+    </div>`;
   }).join('');
 }
 

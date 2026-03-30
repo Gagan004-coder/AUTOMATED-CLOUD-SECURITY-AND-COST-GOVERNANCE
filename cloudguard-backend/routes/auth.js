@@ -70,8 +70,8 @@ router.post('/poll', async (req, res) => {
   try {
     const { sessionId } = req.body;
     const sess = sessions.get(sessionId);
-    if (!sess) return res.status(404).json({ error: 'Session not found' });
-    if (Date.now() > sess.expiresAt) return res.status(410).json({ error: 'Session expired' });
+    if (!sess) return res.status(404).json({ status: 'not_found', error: 'Session expired or server restarted' });
+    if (Date.now() > sess.expiresAt) return res.status(410).json({ status: 'expired', error: 'Device authorization expired' });
 
     const oidc = new SSOOIDCClient({ region: sess.region });
 
